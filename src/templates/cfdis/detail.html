@@ -7,8 +7,8 @@
     <h1>CFDI {{ cfdi.facturama_id or (cfdi.uuid[:8] if cfdi.uuid else '—') }}</h1>
     <div class="actions">
         {% if cfdi.status == 'active' %}
-        <a href="{{ url_for('cfdi.cfdi_pdf', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📄 Descargar PDF</a>
-        <a href="{{ url_for('cfdi.cfdi_xml', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📋 Descargar XML</a>
+        <a href="{{ url_for('cfdi.cfdi_pdf', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📄 PDF</a>
+        <a href="{{ url_for('cfdi.cfdi_xml', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📋 XML</a>
         <form method="post" action="{{ url_for('cfdi.cancel_cfdi', cfdi_id=cfdi.id) }}" style="display:inline" onsubmit="return confirm('¿Cancelar este CFDI?');">
             <select name="motive" style="padding:0.4rem;border:1px solid #ddd;border-radius:4px;">
                 <option value="02">Cancelar (02 - error)</option>
@@ -23,10 +23,18 @@
     </div>
 </div>
 
+{% if error %}
+<div class="card" style="border-left: 4px solid #e74c3c; background: #fdf2f2;">
+    <p style="color: #c0392b; margin: 0;"><strong>Error:</strong> {{ error }}</p>
+</div>
+{% endif %}
+
 <div class="form-row">
     <div class="card">
         <h2>Estado</h2>
         <p><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}" style="font-size:1rem;padding:0.4rem 0.8rem;">{{ cfdi.status|upper }}</span></p>
+        <p style="margin-top:0.5rem;"><strong>UUID:</strong> <code style="font-size:0.85rem;">{{ cfdi.uuid or '—' }}</code></p>
+        <p><strong>Folio:</strong> {{ cfdi.facturama_id or '—' }}</p>
     </div>
     <div class="card">
         <h2>Totales</h2>
@@ -39,33 +47,31 @@
 
 <div class="form-row">
     <div class="card">
+        <h2>Datos del emisor</h2>
+        {% if cfdi.issuer_rfc or cfdi.issuer_name %}
+        <div class="detail-grid">
+            <div class="detail-item"><label>RFC</label><span style="font-weight:bold;">{{ cfdi.issuer_rfc or '—' }}</span></div>
+            <div class="detail-item"><label>Nombre / Razón Social</label><span>{{ cfdi.issuer_name or '—' }}</span></div>
+        </div>
+        {% else %}
+        <p style="color:#888;">Sin información del emisor (issuer_id={{ cfdi.issuer_id }})</p>
+        {% endif %}
+    </div>
+    <div class="card">
         <h2>Datos del receptor</h2>
         <div class="detail-grid">
             <div class="detail-item"><label>RFC</label><span>{{ cfdi.recipient_rfc }}</span></div>
             <div class="detail-item"><label>Nombre</label><span>{{ cfdi.recipient_name or '—' }}</span></div>
         </div>
     </div>
-    {% if cfdi.issuer_id %}
-    {% with issuer = cfdi._issuer %}
-    {% if issuer %}
-    <div class="card">
-        <h2>Datos del emisor</h2>
-        <div class="detail-grid">
-            <div class="detail-item"><label>RFC</label><span>{{ issuer.rfc }}</span></div>
-            <div class="detail-item"><label>Nombre</label><span>{{ issuer.legal_name }}</span></div>
-        </div>
-    </div>
-    {% endif %}
-    {% endwith %}
-    {% endif %}
 </div>
 
-{% if cfdi.raw_payload and cfdi.raw_payload.get('request') %}
+{% if cfdi.raw_payload %}
 <div class="card">
-    <h2>Payload enviado</h2>
+    <h2>Datos originales del CFDI</h2>
     <details>
-        <summary style="cursor:pointer;color:#1a1a2e;">Ver payload</summary>
-        <pre style="background:#f4f6f9;padding:0.75rem;border-radius:4px;overflow:auto;font-size:0.8rem;margin-top:0.5rem;">{{ cfdi.raw_payload.request|tojson(indent=2) }}</pre>
+        <summary style="cursor:pointer;color:#1a1a2e;">Ver payload guardado</summary>
+        <pre style="background:#f4f6f9;padding:0.75rem;border-radius:4px;overflow:auto;font-size:0.8rem;margin-top:0.5rem;max-height:400px;">{{ cfdi.raw_payload|tojson(indent=2) if cfdi.raw_payload is string else cfdi.raw_payload|pprint }}</pre>
     </details>
 </div>
 {% endif %}

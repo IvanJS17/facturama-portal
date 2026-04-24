@@ -25,9 +25,9 @@
     <table>
         <thead>
             <tr>
-                <th>ID / Folio</th>
-                <th>Receptor</th>
-                <th>RFC</th>
+                <th>Emisor</th>
+                <th>Receptor / Cliente</th>
+                <th>RFC Receptor</th>
                 <th>Total</th>
                 <th>Tipo</th>
                 <th>Estado</th>
@@ -37,8 +37,11 @@
         <tbody>
         {% for cfdi in cfdis %}
             <tr>
-                <td><a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}">{{ cfdi.facturama_id or (cfdi.uuid[:8] if cfdi.uuid else '—') }}</a></td>
-                <td>{{ cfdi.recipient_name or '—' }}</td>
+                <td>
+                    <span style="font-weight:bold;color:#1a1a2e;">{{ cfdi.issuer_name or '—' }}</span>
+                    {% if cfdi.issuer_rfc %}<br><small style="color:#666;">{{ cfdi.issuer_rfc }}</small>{% endif %}
+                </td>
+                <td>{{ cfdi.client_name or cfdi.recipient_name or '—' }}</td>
                 <td>{{ cfdi.recipient_rfc }}</td>
                 <td>${{ "%.2f"|format(cfdi.total) }}</td>
                 <td>{{ cfdi.cfdi_type }}</td>

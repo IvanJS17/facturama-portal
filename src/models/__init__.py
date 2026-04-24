@@ -170,6 +170,27 @@ class PortalDatabase:
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY (issuer_id) REFERENCES issuers(id)
                 );
+
+                -- Migration: add issuer_id to clients (if not exists, SQLite supports IF NOT EXISTS for columns via workaround)
+                CREATE TABLE IF NOT EXISTS clients_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    facturama_id TEXT NOT NULL DEFAULT '',
+                    issuer_id INTEGER,
+                    legal_name TEXT NOT NULL,
+                    rfc TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL DEFAULT '',
+                    tax_regime TEXT NOT NULL,
+                    cfdi_use TEXT NOT NULL,
+                    zip_code TEXT NOT NULL,
+                    raw_payload TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (issuer_id) REFERENCES issuers(id)
+                );
+                INSERT OR IGNORE INTO clients_new (id, facturama_id, legal_name, rfc, email, tax_regime, cfdi_use, zip_code, raw_payload, created_at, updated_at)
+                    SELECT id, facturama_id, legal_name, rfc, email, tax_regime, cfdi_use, zip_code, raw_payload, created_at, updated_at FROM clients;
+                DROP TABLE clients;
+                ALTER TABLE clients_new RENAME TO clients;
                 """
             )
 
@@ -335,16 +356,28 @@ class PortalDatabase:
         with self.connect() as conn:
             return conn.execute(
                 """
-                SELECT c.*, i.legal_name AS issuer_name
+                SELECT c.*,
+                       i.rfc        AS issuer_rfc,
+                       i.legal_name AS issuer_name,
+                       cl.legal_name AS client_name
                 FROM cfdis c
                 LEFT JOIN issuers i ON i.id = c.issuer_id
+                LEFT JOIN clients cl ON cl.rfc = c.recipient_rfc AND cl.issuer_id = c.issuer_id
                 ORDER BY c.created_at DESC
                 """
             ).fetchall()
 
-    def get_cfdi(self, cfdi_id: str) -> sqlite3.Row | None:
+    def get_cfdi(self, cfdi_id: int) -> sqlite3.Row | None:
         with self.connect() as conn:
-            return conn.execute("SELECT * FROM cfdis WHERE facturama_id = ?", (cfdi_id,)).fetchone()
+            return conn.execute(
+                """
+                SELECT c.*, i.rfc AS issuer_rfc, i.legal_name AS issuer_name
+                FROM cfdis c
+                LEFT JOIN issuers i ON i.id = c.issuer_id
+                WHERE c.id = ?
+                """,
+                (cfdi_id,),
+            ).fetchone()
 
     def save_cfdi(self, data: dict[str, Any]) -> int:
         now = utc_now()
