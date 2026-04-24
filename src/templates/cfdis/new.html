@@ -28,7 +28,7 @@
             <select id="client_id" name="client_id" required>
                 <option value="">-- Seleccionar cliente --</option>
                 {% for client in clients %}
-                <option value="{{ client.id }}" data-tax-regime="{{ client.tax_regime }}" data-zip="{{ client.zip_code }}" data-cfdi-use="{{ client.cfdi_use }}">{{ client.rfc }} — {{ client.legal_name }}</option>
+                <option value="{{ client.id }}" data-issuer-id="{{ client.issuer_id or '' }}" data-tax-regime="{{ client.tax_regime }}" data-zip="{{ client.zip_code }}" data-cfdi-use="{{ client.cfdi_use }}">{{ client.rfc }} — {{ client.legal_name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -120,6 +120,8 @@ const qtyInput = document.getElementById('quantity');
 const priceInput = document.getElementById('unit_price');
 const ivaSelect = document.getElementById('iva_rate');
 const descInput = document.getElementById('description');
+const issuerSelect = document.getElementById('issuer_id');
+const clientSelect = document.getElementById('client_id');
 
 function calc() {
     const qty = parseFloat(qtyInput.value) || 0;
@@ -145,5 +147,33 @@ qtyInput.addEventListener('input', calc);
 priceInput.addEventListener('input', calc);
 ivaSelect.addEventListener('change', calc);
 calc();
+
+// Filter clients by selected issuer
+function filterClients() {
+    const selectedIssuer = issuerSelect.value;
+    let hasSelected = false;
+    for (const opt of clientSelect.options) {
+        const optIssuer = opt.getAttribute('data-issuer-id') || '';
+        if (!selectedIssuer || optIssuer === selectedIssuer) {
+            opt.style.display = '';
+            // Auto-select first valid client if none selected
+            if (!hasSelected && !clientSelect.value && opt.value) {
+                opt.selected = true;
+                hasSelected = true;
+            }
+        } else {
+            opt.style.display = 'none';
+            if (opt.selected) {
+                opt.selected = false;
+            }
+        }
+    }
+}
+
+if (issuerSelect) {
+    issuerSelect.addEventListener('change', filterClients);
+    // Run on load in case issuer is pre-selected
+    filterClients();
+}
 </script>
 {% endblock %}

@@ -9,26 +9,46 @@
 </div>
 
 <div class="card">
+    <form method="get" class="filter-bar" style="margin-bottom:1rem;">
+        <label style="font-weight:600;">Filtrar por emisor:</label>
+        <select name="issuer_id" onchange="this.form.submit()">
+            <option value="">— Todos los emisores —</option>
+            {% for issuer in issuers %}
+            <option value="{{ issuer.id }}" {{ 'selected' if filter_issuer_id == issuer.id else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
+            {% endfor %}
+        </select>
+        {% if filter_issuer_id %}
+        <a href="{{ url_for('clients.list_clients') }}" class="btn btn-secondary">Limpiar filtro</a>
+        {% endif %}
+    </form>
+
     {% if clients %}
     <table>
         <thead>
             <tr>
+                <th>Emisor</th>
                 <th>RFC</th>
                 <th>Nombre / Razón social</th>
                 <th>Uso CFDI</th>
                 <th>Régimen</th>
-                <th>Email</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
         {% for client in clients %}
             <tr>
+                <td>
+                    {% if client.issuer_name %}
+                    <span style="font-weight:bold;color:#1a1a2e;">{{ client.issuer_name }}</span>
+                    {% if client.issuer_rfc %}<br><small style="color:#666;">{{ client.issuer_rfc }}</small>{% endif %}
+                    {% else %}
+                    <span style="color:#999;">Sin emisor</span>
+                    {% endif %}
+                </td>
                 <td><a href="{{ url_for('clients.edit_client', client_id=client.id) }}">{{ client.rfc }}</a></td>
                 <td>{{ client.legal_name }}</td>
                 <td>{{ client.cfdi_use }}</td>
                 <td>{{ client.tax_regime }}</td>
-                <td>{{ client.email }}</td>
                 <td>
                     <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-secondary">Editar</a>
                     <form method="post" action="{{ url_for('clients.delete_client', client_id=client.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar cliente?');">
@@ -41,8 +61,8 @@
     </table>
     {% else %}
     <div class="empty-state">
-        <p>No hay clientes registrados.</p>
-        <a href="{{ url_for('clients.new_client') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar el primer cliente</a>
+        <p>No hay clientes registrados{% if filter_issuer_id %} para este emisor{% endif %}.</p>
+        <a href="{{ url_for('clients.new_client') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar cliente</a>
     </div>
     {% endif %}
 </div>

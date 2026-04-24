@@ -13,6 +13,7 @@ def _form_to_local(payload: dict, facturama_response: dict | None = None) -> dic
     facturama_response = facturama_response or {}
     return {
         "facturama_id": str(facturama_response.get("Id") or payload.get("facturama_id", "")),
+        "issuer_id": int(payload["issuer_id"]) if payload.get("issuer_id") else None,
         "legal_name": payload["legal_name"],
         "rfc": payload["rfc"],
         "email": payload.get("email", ""),
@@ -25,12 +26,22 @@ def _form_to_local(payload: dict, facturama_response: dict | None = None) -> dic
 
 @bp.get("/")
 def list_clients():
-    return render_template("clients/list.html", clients=db().list_clients())
+    issuer_filter = request.args.get("issuer_id", type=int)
+    return render_template(
+        "clients/list.html",
+        clients=db().list_clients(issuer_id=issuer_filter),
+        issuers=db().list_issuers(),
+        filter_issuer_id=issuer_filter,
+    )
 
 
 @bp.get("/new")
 def new_client():
-    return render_template("clients/form.html", client=None)
+    return render_template(
+        "clients/form.html",
+        client=None,
+        issuers=db().list_issuers(),
+    )
 
 
 @bp.post("/")
@@ -46,7 +57,11 @@ def create_client():
 @bp.get("/<int:client_id>/edit")
 def edit_client(client_id: int):
     client = row_or_404(db().get_client(client_id), "Client not found")
-    return render_template("clients/form.html", client=client)
+    return render_template(
+        "clients/form.html",
+        client=client,
+        issuers=db().list_issuers(),
+    )
 
 
 @bp.post("/<int:client_id>")

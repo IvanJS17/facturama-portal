@@ -127,15 +127,18 @@ class PortalDatabase:
                 CREATE TABLE IF NOT EXISTS clients (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     facturama_id TEXT NOT NULL DEFAULT '',
+                    issuer_id INTEGER,
                     legal_name TEXT NOT NULL,
-                    rfc TEXT NOT NULL UNIQUE,
+                    rfc TEXT NOT NULL,
                     email TEXT NOT NULL DEFAULT '',
                     tax_regime TEXT NOT NULL,
                     cfdi_use TEXT NOT NULL,
                     zip_code TEXT NOT NULL,
                     raw_payload TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(rfc, issuer_id),
+                    FOREIGN KEY (issuer_id) REFERENCES issuers(id)
                 );
 
                 CREATE TABLE IF NOT EXISTS products (
@@ -239,19 +242,39 @@ class PortalDatabase:
         with self.connect() as conn:
             conn.execute("DELETE FROM issuers WHERE id = ?", (issuer_id,))
 
-    def list_clients(self) -> list[sqlite3.Row]:
+    def list_clients(self, issuer_id: int | None = None) -> list[sqlite3.Row]:
+        base = """
+            SELECT c.*, i.legal_name AS issuer_name, i.rfc AS issuer_rfc
+            FROM clients c
+            LEFT JOIN issuers i ON i.id = c.issuer_id
+        """
+        if issuer_id is not None:
+            with self.connect() as conn:
+                return conn.execute(
+                    f"{base} WHERE c.issuer_id = ? ORDER BY c.legal_name",
+                    (issuer_id,),
+                ).fetchall()
         with self.connect() as conn:
-            return conn.execute("SELECT * FROM clients ORDER BY legal_name").fetchall()
+            return conn.execute(f"{base} ORDER BY c.legal_name").fetchall()
 
     def get_client(self, client_id: int) -> sqlite3.Row | None:
         with self.connect() as conn:
-            return conn.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+            return conn.execute(
+                """
+                SELECT c.*, i.legal_name AS issuer_name, i.rfc AS issuer_rfc
+                FROM clients c
+                LEFT JOIN issuers i ON i.id = c.issuer_id
+                WHERE c.id = ?
+                """,
+                (client_id,),
+            ).fetchone()
 
     def upsert_client(self, data: dict[str, Any], client_id: int | None = None) -> int:
         now = utc_now()
         raw_payload = json.dumps(data.get("raw_payload", {}), ensure_ascii=True)
         values = (
             data.get("facturama_id", "").strip(),
+            data.get("issuer_id"),
             data["legal_name"].strip(),
             data["rfc"].strip().upper(),
             data.get("email", "").strip(),
@@ -266,7 +289,7 @@ class PortalDatabase:
                 conn.execute(
                     """
                     UPDATE clients
-                    SET facturama_id = ?, legal_name = ?, rfc = ?, email = ?,
+                    SET facturama_id = ?, issuer_id = ?, legal_name = ?, rfc = ?, email = ?,
                         tax_regime = ?, cfdi_use = ?, zip_code = ?, raw_payload = ?,
                         updated_at = ?
                     WHERE id = ?
@@ -277,10 +300,10 @@ class PortalDatabase:
             cursor = conn.execute(
                 """
                 INSERT INTO clients
-                    (facturama_id, legal_name, rfc, email, tax_regime, cfdi_use,
+                    (facturama_id, issuer_id, legal_name, rfc, email, tax_regime, cfdi_use,
                      zip_code, raw_payload, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(rfc) DO UPDATE SET
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(rfc, issuer_id) DO UPDATE SET
                     facturama_id = excluded.facturama_id,
                     legal_name = excluded.legal_name,
                     email = excluded.email,
@@ -290,11 +313,14 @@ class PortalDatabase:
                     raw_payload = excluded.raw_payload,
                     updated_at = excluded.updated_at
                 """,
-                (*values[:-1], now, now),
+                values,
             )
             if cursor.lastrowid:
                 return int(cursor.lastrowid)
-            row = conn.execute("SELECT id FROM clients WHERE rfc = ?", (data["rfc"].strip().upper(),)).fetchone()
+            row = conn.execute(
+                "SELECT id FROM clients WHERE rfc = ? AND issuer_id = ?",
+                (data["rfc"].strip().upper(), data.get("issuer_id")),
+            ).fetchone()
             return int(row["id"])
 
     def delete_client(self, client_id: int) -> None:

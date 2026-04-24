@@ -9,6 +9,16 @@
 
 <div class="card">
     <form method="post">
+        <div class="form-group">
+            <label for="issuer_id">Emisor *</label>
+            <select id="issuer_id" name="issuer_id" required>
+                <option value="">-- Seleccionar emisor --</option>
+                {% for issuer in issuers %}
+                <option value="{{ issuer.id }}" {{ 'selected' if client and client.issuer_id == issuer.id else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
         <div class="form-row">
             <div class="form-group">
                 <label for="rfc">RFC *</label>
