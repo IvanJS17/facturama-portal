@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}CFDI {{ cfdi.facturama_id or cfdi.uuid[:8] }} — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>CFDI {{ cfdi.facturama_id or (cfdi.uuid[:8] if cfdi.uuid else '—') }}</h1>
+    <div class="actions">
+        {% if cfdi.status == 'active' %}
+        <a href="{{ url_for('cfdi.cfdi_pdf', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📄 Descargar PDF</a>
+        <a href="{{ url_for('cfdi.cfdi_xml', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📋 Descargar XML</a>
+        <form method="post" action="{{ url_for('cfdi.cancel_cfdi', cfdi_id=cfdi.id) }}" style="display:inline" onsubmit="return confirm('¿Cancelar este CFDI?');">
+            <select name="motive" style="padding:0.4rem;border:1px solid #ddd;border-radius:4px;">
+                <option value="02">Cancelar (02 - error)</option>
+                <option value="01">01 - Sustitución</option>
+                <option value="03">03 - No se llevó a cabo</option>
+                <option value="04">04 - Factura global</option>
+            </select>
+            <button type="submit" class="btn btn-danger">Cancelar CFDI</button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-secondary">← Volver</a>
+    </div>
+</div>
+
+<div class="form-row">
+    <div class="card">
+        <h2>Estado</h2>
+        <p><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}" style="font-size:1rem;padding:0.4rem 0.8rem;">{{ cfdi.status|upper }}</span></p>
+    </div>
+    <div class="card">
+        <h2>Totales</h2>
+        <p><strong>Total:</strong> ${{ "%.2f"|format(cfdi.total) }}</p>
+        {% if cfdi.cfdi_type %}<p><strong>Tipo:</strong> {{ cfdi.cfdi_type }}</p>{% endif %}
+        {% if cfdi.payment_form %}<p><strong>Forma de pago:</strong> {{ cfdi.payment_form }}</p>{% endif %}
+        {% if cfdi.payment_method %}<p><strong>Método:</strong> {{ cfdi.payment_method }}</p>{% endif %}
+    </div>
+</div>
+
+<div class="form-row">
+    <div class="card">
+        <h2>Datos del receptor</h2>
+        <div class="detail-grid">
+            <div class="detail-item"><label>RFC</label><span>{{ cfdi.recipient_rfc }}</span></div>
+            <div class="detail-item"><label>Nombre</label><span>{{ cfdi.recipient_name or '—' }}</span></div>
+        </div>
+    </div>
+    {% if cfdi.issuer_id %}
+    {% with issuer = cfdi._issuer %}
+    {% if issuer %}
+    <div class="card">
+        <h2>Datos del emisor</h2>
+        <div class="detail-grid">
+            <div class="detail-item"><label>RFC</label><span>{{ issuer.rfc }}</span></div>
+            <div class="detail-item"><label>Nombre</label><span>{{ issuer.legal_name }}</span></div>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
+</div>
+
+{% if cfdi.raw_payload and cfdi.raw_payload.get('request') %}
+<div class="card">
+    <h2>Payload enviado</h2>
+    <details>
+        <summary style="cursor:pointer;color:#1a1a2e;">Ver payload</summary>
+        <pre style="background:#f4f6f9;padding:0.75rem;border-radius:4px;overflow:auto;font-size:0.8rem;margin-top:0.5rem;">{{ cfdi.raw_payload.request|tojson(indent=2) }}</pre>
+    </details>
+</div>
+{% endif %}
+{% endblock %}

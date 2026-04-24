@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if product else 'Nuevo' }} Producto — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ 'Editar' if product else 'Nuevo' }} Producto / Servicio</h1>
+</div>
+
+<div class="card">
+    <form method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Nombre *</label>
+                <input type="text" id="name" name="name" value="{{ product.name if product else '' }}" required placeholder="Consultoría profesional">
+            </div>
+            <div class="form-group">
+                <label for="price">Precio unitario *</label>
+                <input type="number" id="price" name="price" value="{{ product.price if product else '0' }}" required min="0" step="0.01" placeholder="0.00">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="product_code">Código SAT (ProdServ)</label>
+                <input type="text" id="product_code" name="product_code" value="{{ product.product_code if product else '01010101' }}" maxlength="8" placeholder="01010101">
+            </div>
+            <div class="form-group">
+                <label for="unit_code">Clave de unidad SAT</label>
+                <input type="text" id="unit_code" name="unit_code" value="{{ product.unit_code if product else 'E48' }}" maxlength="3" placeholder="E48">
+            </div>
+            <div class="form-group">
+                <label for="unit">Unidad de medida</label>
+                <input type="text" id="unit" name="unit" value="{{ product.unit if product else 'Servicio' }}" placeholder="Servicio">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="identification_number">Número de identificación</label>
+                <input type="text" id="identification_number" name="identification_number" value="{{ product.identification_number if product else '' }}" placeholder="SKU o referencia interna">
+            </div>
+            <div class="form-group">
+                <label for="tax_object">Objeto del impuesto</label>
+                <select id="tax_object" name="tax_object">
+                    <option value="01" {{ 'selected' if product and product.tax_object == '01' else '' }}>01 - No objeto de impuesto</option>
+                    <option value="02" {{ 'selected' if product and product.tax_object == '02' or not product else '' }}>02 - Sí objeto de impuesto</option>
+                    <option value="03" {{ 'selected' if product and product.tax_object == '03' else '' }}>03 - Retención del impuesto</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if product else 'Crear producto' }}</button>
+            <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

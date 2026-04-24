@@ -1,33 +1,48 @@
 """Flask application factory and configuration."""
 
-import os
-from flask import Flask
+from flask import Flask, render_template
 from dotenv import load_dotenv
+
+from src.models import PortalDatabase
+from src.services.facturama_api import FacturamaAPIError
+from src.utils.config import Config
 
 load_dotenv()
 
 
 def create_app() -> Flask:
     """Create and configure the Flask application."""
+    config = Config.from_env()
     app = Flask(__name__)
 
-    # Configuration
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
-    app.config["FACTURAMA_API_URL"] = os.getenv(
-        "FACTURAMA_API_URL", "https://www.api.facturama.com"
-    )
-    app.config["FACTURAMA_API_KEY"] = os.getenv("FACTURAMA_API_KEY", "")
+    app.config["SECRET_KEY"] = config.secret_key
+    app.config["FACTURAMA_API_URL"] = config.facturama_api_url
+    app.config["DATABASE_URL"] = config.database_url
+    app.config["PORTAL_CONFIG"] = config
 
-    # Register blueprints
-    from src.routes import cfdi, clients, products
+    database = PortalDatabase(config.database_url)
+    database.init_schema()
+    app.extensions["portal_db"] = database
 
+    from src.routes import cfdi, clients, dashboard, issuers, products
+
+    app.register_blueprint(dashboard.bp)
     app.register_blueprint(cfdi.bp)
+    app.register_blueprint(cfdi.api_bp)
     app.register_blueprint(clients.bp)
+    app.register_blueprint(clients.api_bp)
+    app.register_blueprint(issuers.bp)
+    app.register_blueprint(issuers.api_bp)
     app.register_blueprint(products.bp)
+    app.register_blueprint(products.api_bp)
 
     @app.route("/health")
     def health():
         return {"status": "ok"}
+
+    @app.errorhandler(FacturamaAPIError)
+    def facturama_error(error: FacturamaAPIError):
+        return render_template("errors/facturama.html", error=error), 502
 
     return app
 

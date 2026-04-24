@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if issuer else 'Nuevo' }} Emisor — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ 'Editar' if issuer else 'Nuevo' }} Emisor</h1>
+</div>
+
+<div class="card">
+    <form method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="rfc">RFC *</label>
+                <input type="text" id="rfc" name="rfc" value="{{ issuer.rfc if issuer else '' }}" required maxlength="13" placeholder="XAXX010101000">
+            </div>
+            <div class="form-group">
+                <label for="legal_name">Nombre legal *</label>
+                <input type="text" id="legal_name" name="legal_name" value="{{ issuer.legal_name if issuer else '' }}" required placeholder="EMPRESA SA DE CV">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="tax_regime">Régimen fiscal *</label>
+                <select id="tax_regime" name="tax_regime" required>
+                    <option value="601" {{ 'selected' if issuer and issuer.tax_regime == '601' else '' }}>601 - General de Ley Personas Morales</option>
+                    <option value="603" {{ 'selected' if issuer and issuer.tax_regime == '603' else '' }}>603 - Personas Morales con ingresos a través deArrays</option>
+                    <option value="605" {{ 'selected' if issuer and issuer.tax_regime == '605' else '' }}>605 - Sueldos y salarios ingresos asimilados a salarios</option>
+                    <option value="606" {{ 'selected' if issuer and issuer.tax_regime == '606' else '' }}>606 - Arrendamiento</option>
+                    <option value="608" {{ 'selected' if issuer and issuer.tax_regime == '608' else '' }}>608 - Demas ingresos</option>
+                    <option value="609" {{ 'selected' if issuer and issuer.tax_regime == '609' else '' }}>609 - Consolidacion fiscal</option>
+                    <option value="610" {{ 'selected' if issuer and issuer.tax_regime == '610' else '' }}>610 - Residentes extranjeros</option>
+                    <option value="611" {{ 'selected' if issuer and issuer.tax_regime == '611' else '' }}>611 - Ingresos por dividendos personas fisicas</option>
+                    <option value="612" {{ 'selected' if issuer and issuer.tax_regime == '612' else '' }}>612 - Intereses personas fisicas</option>
+                    <option value="614" {{ 'selected' if issuer and issuer.tax_regime == '614' else '' }}>614 - Ingresos personas fisicas actividades.empresariales</option>
+                    <option value="615" {{ 'selected' if issuer and issuer.tax_regime == '615' else '' }}>615 - Ingresos por intereses</option>
+                    <option value="616" {{ 'selected' if issuer and issuer.tax_regime == '616' else '' }}>616 - Otros ingresos personas fisicas</option>
+                    <option value="620" {{ 'selected' if issuer and issuer.tax_regime == '620' else '' }}>620 - Sociedades cooperatives de produccion</option>
+                    <option value="621" {{ 'selected' if issuer and issuer.tax_regime == '621' else '' }}>621 - Valores burbuja</option>
+                    <option value="622" {{ 'selected' if issuer and issuer.tax_regime == '622' else '' }}>622 - Arrendamiento naviero</option>
+                    <option value="623" {{ 'selected' if issuer and issuer.tax_regime == '623' else '' }}>623 - Optativas personas fisicas</option>
+                    <option value="624" {{ 'selected' if issuer and issuer.tax_regime == '624' else '' }}>624 - Personas fisicas con ingresosHOT</option>
+                    <option value="628" {{ 'selected' if issuer and issuer.tax_regime == '628' else '' }}>628 - Hidrocarburos</option>
+                    <option value="629" {{ 'selected' if issuer and issuer.tax_regime == '629' else '' }}>629 - Sin obligaciones fiscales</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="zip_code">Código postal *</label>
+                <input type="text" id="zip_code" name="zip_code" value="{{ issuer.zip_code if issuer else '' }}" required maxlength="5" placeholder="78116">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="email">Email de contacto</label>
+                <input type="email" id="email" name="email" value="{{ issuer.email if issuer else '' }}" placeholder="contable@empresa.com">
+            </div>
+            {% if issuer %}
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <label style="display:flex;align-items:center;gap:0.4rem;margin-top:0.3rem;">
+                    <input type="checkbox" name="active" value="1" {{ 'checked' if issuer.active else '' }}>
+                    Emisor activo
+                </label>
+            </div>
+            {% endif %}
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if issuer else 'Crear emisor' }}</button>
+            <a href="{{ url_for('issuers.list_issuers') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

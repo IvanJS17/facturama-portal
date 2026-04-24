@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if client else 'Nuevo' }} Cliente — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ 'Editar' if client else 'Nuevo' }} Cliente</h1>
+</div>
+
+<div class="card">
+    <form method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="rfc">RFC *</label>
+                <input type="text" id="rfc" name="rfc" value="{{ client.rfc if client else '' }}" required maxlength="13" placeholder="XAXX010101000">
+            </div>
+            <div class="form-group">
+                <label for="legal_name">Nombre / Razón social *</label>
+                <input type="text" id="legal_name" name="legal_name" value="{{ client.legal_name if client else '' }}" required placeholder="CLIENTE SA DE CV">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="cfdi_use">Uso CFDI *</label>
+                <select id="cfdi_use" name="cfdi_use" required>
+                    <option value="G01" {{ 'selected' if client and client.cfdi_use == 'G01' else '' }}>G01 - Adquisición de mercancias</option>
+                    <option value="G02" {{ 'selected' if client and client.cfdi_use == 'G02' else '' }}>G02 - Devoluciones, descuentos o bonificaciones</option>
+                    <option value="G03" {{ 'selected' if client and client.cfdi_use == 'G03' else '' }}>G03 - Gastos en general</option>
+                    <option value="I01" {{ 'selected' if client and client.cfdi_use == 'I01' else '' }}>I01 - Construcciones</option>
+                    <option value="I02" {{ 'selected' if client and client.cfdi_use == 'I02' else '' }}>I02 - Mobiliario y equipo de oficina por inversiones</option>
+                    <option value="I03" {{ 'selected' if client and client.cfdi_use == 'I03' else '' }}>I03 - Equipo de transporte</option>
+                    <option value="I04" {{ 'selected' if client and client.cfdi_use == 'I04' else '' }}>I04 - Equipo de computo y accesorios</option>
+                    <option value="I05" {{ 'selected' if client and client.cfdi_use == 'I05' else '' }}>I05 - Dados, troqueles, moldes, matrices y herramental</option>
+                    <option value="I06" {{ 'selected' if client and client.cfdi_use == 'I06' else '' }}>I06 - Comunicaciones telefónicas</option>
+                    <option value="I07" {{ 'selected' if client and client.cfdi_use == 'I07' else '' }}>I07 - Comunicaciones satelitales</option>
+                    <option value="I08" {{ 'selected' if client and client.cfdi_use == 'I08' else '' }}>I08 - Otra maquinaria y equipo</option>
+                    <option value="D01" {{ 'selected' if client and client.cfdi_use == 'D01' else '' }}>D01 - Honorarios médicos, dentales y gastos hospitalarios</option>
+                    <option value="D02" {{ 'selected' if client and client.cfdi_use == 'D02' else '' }}>D02 - Gastos médicos por incapacidad o discapacidad</option>
+                    <option value="D03" {{ 'selected' if client and client.cfdi_use == 'D03' else '' }}>D03 - Gastos funerales</option>
+                    <option value="D04" {{ 'selected' if client and client.cfdi_use == 'D04' else '' }}>D04 - Donativos</option>
+                    <option value="D05" {{ 'selected' if client and client.cfdi_use == 'D05' else '' }}>D05 - Intereses reales efectivos por créditos hipotecarios</option>
+                    <option value="D06" {{ 'selected' if client and client.cfdi_use == 'D06' else '' }}>D06 - Aportaciones voluntarias al SAR</option>
+                    <option value="D07" {{ 'selected' if client and client.cfdi_use == 'D07' else '' }}>D07 - Aportaciones voluntarias cuenta individual</option>
+                    <option value="D08" {{ 'selected' if client and client.cfdi_use == 'D08' else '' }}>D08 - intereses generados en inversiones</option>
+                    <option value="D09" {{ 'selected' if client and client.cfdi_use == 'D09' else '' }}>D09 - Pago de executor de alimentos</option>
+                    <option value="D10" {{ 'selected' if client and client.cfdi_use == 'D10' else '' }}>D10 - Gastos por servicios de clearara</option>
+                    <option value="S01" {{ 'selected' if client and client.cfdi_use == 'S01' else '' }}>S01 - Sin efectos fiscales</option>
+                    <option value="CP01" {{ 'selected' if client and client.cfdi_use == 'CP01' else '' }}>CP01 - Pagos</option>
+                    <option value="CN01" {{ 'selected' if client and client.cfdi_use == 'CN01' else '' }}>CN01 - Nómina</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="tax_regime">Régimen fiscal del receptor *</label>
+                <select id="tax_regime" name="tax_regime" required>
+                    <option value="601" {{ 'selected' if client and client.tax_regime == '601' else '' }}>601 - General de Ley Personas Morales</option>
+                    <option value="603" {{ 'selected' if client and client.tax_regime == '603' else '' }}>603 - Personas Morales con ingresos a través deArrays</option>
+                    <option value="605" {{ 'selected' if client and client.tax_regime == '605' else '' }}>605 - Sueldos y salarios</option>
+                    <option value="606" {{ 'selected' if client and client.tax_regime == '606' else '' }}>606 - Arrendamiento</option>
+                    <option value="612" {{ 'selected' if client and client.tax_regime == '612' else '' }}>612 - Intereses personas fisicas</option>
+                    <option value="614" {{ 'selected' if client and client.tax_regime == '614' else '' }}>614 - Personas fisicas actividades.empresariales</option>
+                    <option value="615" {{ 'selected' if client and client.tax_regime == '615' else '' }}>615 - Ingresos por intereses</option>
+                    <option value="616" {{ 'selected' if client and client.tax_regime == '616' else '' }}>616 - Otros ingresos personas fisicas</option>
+                    <option value="621" {{ 'selected' if client and client.tax_regime == '621' else '' }}>621 - Valores burbuja</option>
+                    <option value="629" {{ 'selected' if client and client.tax_regime == '629' else '' }}>629 - Sin obligaciones fiscales</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="{{ client.email if client else '' }}" placeholder="cliente@email.com">
+            </div>
+            <div class="form-group">
+                <label for="zip_code">Código postal *</label>
+                <input type="text" id="zip_code" name="zip_code" value="{{ client.zip_code if client else '' }}" required maxlength="5" placeholder="78116">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if client else 'Crear cliente' }}</button>
+            <a href="{{ url_for('clients.list_clients') }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

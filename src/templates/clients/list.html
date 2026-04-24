@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Clientes</h1>
+    <a href="{{ url_for('clients.new_client') }}" class="btn btn-primary">+ Agregar cliente</a>
+</div>
+
+<div class="card">
+    {% if clients %}
+    <table>
+        <thead>
+            <tr>
+                <th>RFC</th>
+                <th>Nombre / Razón social</th>
+                <th>Uso CFDI</th>
+                <th>Régimen</th>
+                <th>Email</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for client in clients %}
+            <tr>
+                <td><a href="{{ url_for('clients.edit_client', client_id=client.id) }}">{{ client.rfc }}</a></td>
+                <td>{{ client.legal_name }}</td>
+                <td>{{ client.cfdi_use }}</td>
+                <td>{{ client.tax_regime }}</td>
+                <td>{{ client.email }}</td>
+                <td>
+                    <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-secondary">Editar</a>
+                    <form method="post" action="{{ url_for('clients.delete_client', client_id=client.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar cliente?');">
+                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No hay clientes registrados.</p>
+        <a href="{{ url_for('clients.new_client') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar el primer cliente</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}CFDIs — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>CFDIs</h1>
+    <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">+ Nueva Factura</a>
+</div>
+
+<div class="card">
+    {# Filters #}
+    <form method="get" class="filter-bar">
+        <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="Buscar por RFC o nombre...">
+        <select name="status">
+            <option value="">Todos los estados</option>
+            <option value="active" {{ 'selected' if request.args.get('status') == 'active' else '' }}>Activos</option>
+            <option value="canceled" {{ 'selected' if request.args.get('status') == 'canceled' else '' }}>Cancelados</option>
+        </select>
+        <button type="submit" class="btn btn-secondary">Filtrar</button>
+        <a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-secondary">Limpiar</a>
+    </form>
+
+    {% if cfdis %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID / Folio</th>
+                <th>Receptor</th>
+                <th>RFC</th>
+                <th>Total</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for cfdi in cfdis %}
+            <tr>
+                <td><a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}">{{ cfdi.facturama_id or (cfdi.uuid[:8] if cfdi.uuid else '—') }}</a></td>
+                <td>{{ cfdi.recipient_name or '—' }}</td>
+                <td>{{ cfdi.recipient_rfc }}</td>
+                <td>${{ "%.2f"|format(cfdi.total) }}</td>
+                <td>{{ cfdi.cfdi_type }}</td>
+                <td><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}">{{ cfdi.status }}</span></td>
+                <td>
+                    <a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}" class="btn btn-sm btn-secondary">Ver</a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No hay CFDIs registrados.</p>
+        <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Crear primera factura</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
