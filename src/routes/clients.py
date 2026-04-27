@@ -1,6 +1,6 @@
 """Client routes."""
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, render_template, request
 
 from src.routes.common import api, db, flash_and_redirect, row_or_404
 from src.services.facturama_api import build_client_payload
@@ -9,11 +9,23 @@ bp = Blueprint("clients", __name__, url_prefix="/clients")
 api_bp = Blueprint("clients_api", __name__, url_prefix="/api/clients")
 
 
+def _require_existing_issuer(payload: dict) -> int:
+    """Return a validated issuer id or abort with a client-facing 400."""
+    try:
+        issuer_id = int(payload.get("issuer_id") or 0)
+    except (TypeError, ValueError):
+        issuer_id = 0
+    if not issuer_id or db().get_issuer(issuer_id) is None:
+        abort(400, "Selecciona un emisor válido para el cliente")
+    return issuer_id
+
+
 def _form_to_local(payload: dict, facturama_response: dict | None = None) -> dict:
     facturama_response = facturama_response or {}
+    issuer_id = _require_existing_issuer(payload)
     return {
         "facturama_id": str(facturama_response.get("Id") or payload.get("facturama_id", "")),
-        "issuer_id": int(payload["issuer_id"]) if payload.get("issuer_id") else None,
+        "issuer_id": issuer_id,
         "legal_name": payload["legal_name"],
         "rfc": payload["rfc"],
         "email": payload.get("email", ""),
@@ -37,10 +49,14 @@ def list_clients():
 
 @bp.get("/new")
 def new_client():
+    selected_issuer_id = request.args.get("issuer_id", type=int)
+    if selected_issuer_id is not None:
+        row_or_404(db().get_issuer(selected_issuer_id), "Emisor no encontrado")
     return render_template(
         "clients/form.html",
         client=None,
         issuers=db().list_issuers(),
+        selected_issuer_id=selected_issuer_id,
     )
 
 
@@ -61,6 +77,7 @@ def edit_client(client_id: int):
         "clients/form.html",
         client=client,
         issuers=db().list_issuers(),
+        selected_issuer_id=client.get("issuer_id"),
     )
 
 
@@ -72,7 +89,7 @@ def update_client(client_id: int):
     if request.form.get("sync_facturama") and existing.get("facturama_id"):
         facturama_response = api().update_client(existing["facturama_id"], build_client_payload(payload))
     db().upsert_client(_form_to_local(payload, facturama_response), client_id)
-    return flash_and_redirect("Cliente actualizado.", "clients.list_clients")
+    return flash_and_redirect("Cliente actualizado.", "clients.list_clients", issuer_id=int(payload["issuer_id"]))
 
 
 @bp.post("/<int:client_id>/delete")
@@ -81,12 +98,13 @@ def delete_client(client_id: int):
     if request.form.get("sync_facturama") and client.get("facturama_id"):
         api().delete_client(client["facturama_id"])
     db().delete_client(client_id)
-    return flash_and_redirect("Cliente eliminado.", "clients.list_clients")
+    return flash_and_redirect("Cliente eliminado.", "clients.list_clients", issuer_id=client.get("issuer_id"))
 
 
 @api_bp.get("/")
 def api_list_clients():
-    return jsonify([dict(row) for row in db().list_clients()])
+    issuer_filter = request.args.get("issuer_id", type=int)
+    return jsonify([dict(row) for row in db().list_clients(issuer_id=issuer_filter)])
 
 
 @api_bp.post("/")

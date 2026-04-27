@@ -38,6 +38,7 @@ body {
 /* Page header */
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem; }
 .page-header h1 { font-size: 1.5rem; color: #1a1a2e; }
+.page-subtitle { color: #666; font-size: 0.9rem; margin-top: 0.15rem; }
 
 /* Cards */
 .card { background: #fff; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 1rem; }

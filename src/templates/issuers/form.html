@@ -66,6 +66,10 @@
         </div>
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if issuer else 'Crear emisor' }}</button>
+            {% if issuer %}
+            <a href="{{ url_for('clients.list_clients', issuer_id=issuer.id) }}" class="btn btn-secondary">Ver clientes</a>
+            <a href="{{ url_for('clients.new_client', issuer_id=issuer.id) }}" class="btn btn-secondary">Agregar cliente</a>
+            {% endif %}
             <a href="{{ url_for('issuers.list_issuers') }}" class="btn btn-secondary">Cancelar</a>
         </div>
     </form>

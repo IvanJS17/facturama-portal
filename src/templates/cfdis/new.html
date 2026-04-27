@@ -40,7 +40,7 @@
             <select id="product_id" name="product_id" required>
                 <option value="">-- Seleccionar producto --</option>
                 {% for product in products %}
-                <option value="{{ product.id }}" data-price="{{ product.price }}" data-name="{{ product.name }}" data-code="{{ product.product_code }}" data-unit="{{ product.unit }}" data-unit-code="{{ product.unit_code }}" data-tax-object="{{ product.tax_object }}">{{ product.name }} — ${{ "%.2f"|format(product.price) }}</option>
+                <option value="{{ product.id }}" data-issuer-id="{{ product.issuer_id }}" data-price="{{ product.price }}" data-name="{{ product.name }}" data-code="{{ product.product_code }}" data-unit="{{ product.unit }}" data-unit-code="{{ product.unit_code }}" data-tax-object="{{ product.tax_object }}">{{ product.name }} — ${{ "%.2f"|format(product.price) }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -148,32 +148,42 @@ priceInput.addEventListener('input', calc);
 ivaSelect.addEventListener('change', calc);
 calc();
 
-// Filter clients by selected issuer
-function filterClients() {
+// Filter clients and products by selected issuer. Backend also enforces this.
+function filterScopedSelect(selectEl) {
     const selectedIssuer = issuerSelect.value;
-    let hasSelected = false;
-    for (const opt of clientSelect.options) {
-        const optIssuer = opt.getAttribute('data-issuer-id') || '';
-        if (!selectedIssuer || optIssuer === selectedIssuer) {
+    let currentSelectionStillValid = false;
+
+    for (const opt of selectEl.options) {
+        if (!opt.value) {
             opt.style.display = '';
-            // Auto-select first valid client if none selected
-            if (!hasSelected && !clientSelect.value && opt.value) {
-                opt.selected = true;
-                hasSelected = true;
-            }
-        } else {
-            opt.style.display = 'none';
-            if (opt.selected) {
-                opt.selected = false;
-            }
+            continue;
         }
+        const optIssuer = opt.getAttribute('data-issuer-id') || '';
+        const visible = Boolean(selectedIssuer) && optIssuer === selectedIssuer;
+        opt.style.display = visible ? '' : 'none';
+        if (!visible && opt.selected) {
+            opt.selected = false;
+        }
+        if (visible && opt.selected) {
+            currentSelectionStillValid = true;
+        }
+    }
+
+    if (!selectedIssuer || !currentSelectionStillValid) {
+        selectEl.value = '';
     }
 }
 
+function filterIssuerScopedFields() {
+    filterScopedSelect(clientSelect);
+    filterScopedSelect(productSelect);
+    calc();
+}
+
 if (issuerSelect) {
-    issuerSelect.addEventListener('change', filterClients);
+    issuerSelect.addEventListener('change', filterIssuerScopedFields);
     // Run on load in case issuer is pre-selected
-    filterClients();
+    filterIssuerScopedFields();
 }
 </script>
 {% endblock %}

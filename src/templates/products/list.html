@@ -4,15 +4,37 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Productos</h1>
-    <a href="{{ url_for('products.new_product') }}" class="btn btn-primary">+ Agregar producto</a>
+    <div>
+        <h1>Productos</h1>
+        {% if filter_issuer_id %}
+        {% for issuer in issuers %}{% if issuer.id == filter_issuer_id %}
+        <p class="page-subtitle">Mostrando productos de {{ issuer.legal_name }} — {{ issuer.rfc }}</p>
+        {% endif %}{% endfor %}
+        {% endif %}
+    </div>
+    <a href="{{ url_for('products.new_product', issuer_id=filter_issuer_id) if filter_issuer_id else url_for('products.new_product') }}" class="btn btn-primary">+ Agregar producto</a>
 </div>
 
 <div class="card">
+    <form method="get" class="filter-bar" style="margin-bottom:1rem;">
+        <label style="font-weight:600;">Filtrar por emisor:</label>
+        <select name="issuer_id" onchange="this.form.submit()">
+            <option value="">— Todos los emisores —</option>
+            {% for issuer in issuers %}
+            <option value="{{ issuer.id }}" {{ 'selected' if filter_issuer_id == issuer.id else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
+            {% endfor %}
+        </select>
+        {% if filter_issuer_id %}
+        <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Limpiar filtro</a>
+        {% endif %}
+    </form>
+
+    <h2>Catálogo de productos por emisor</h2>
     {% if products %}
     <table>
         <thead>
             <tr>
+                <th>Emisor</th>
                 <th>Nombre</th>
                 <th>Código SAT</th>
                 <th>Unidad</th>
@@ -23,6 +45,10 @@
         <tbody>
         {% for product in products %}
             <tr>
+                <td>
+                    <span style="font-weight:bold;color:#1a1a2e;">{{ product.issuer_name }}</span>
+                    {% if product.issuer_rfc %}<br><small style="color:#666;">{{ product.issuer_rfc }}</small>{% endif %}
+                </td>
                 <td><a href="{{ url_for('products.edit_product', product_id=product.id) }}">{{ product.name }}</a></td>
                 <td>{{ product.product_code }}</td>
                 <td>{{ product.unit }}</td>
@@ -39,8 +65,55 @@
     </table>
     {% else %}
     <div class="empty-state">
-        <p>No hay productos registrados.</p>
-        <a href="{{ url_for('products.new_product') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar el primer producto</a>
+        <p>No hay productos registrados{% if filter_issuer_id %} para este emisor{% endif %}.</p>
+        <a href="{{ url_for('products.new_product', issuer_id=filter_issuer_id) if filter_issuer_id else url_for('products.new_product') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar producto</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Productos facturados</h2>
+    <p class="page-subtitle">Historial real por emisor: producto → emisor → clientes a los que se facturó.</p>
+
+    {% if invoiced_products %}
+    <table>
+        <thead>
+            <tr>
+                <th>Emisor</th>
+                <th>Producto facturado</th>
+                <th>Código SAT</th>
+                <th>Facturas</th>
+                <th>Total facturado</th>
+                <th>Clientes facturados</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in invoiced_products %}
+            <tr>
+                <td>
+                    <span style="font-weight:bold;color:#1a1a2e;">{{ item.issuer_name }}</span>
+                    {% if item.issuer_rfc %}<br><small style="color:#666;">{{ item.issuer_rfc }}</small>{% endif %}
+                </td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.product_code }}</td>
+                <td>{{ item.invoice_count }}</td>
+                <td>${{ "%.2f"|format(item.total or 0) }}</td>
+                <td>
+                    {% set names = (item.billed_client_names or '').split(',') %}
+                    {% set rfcs = (item.billed_client_rfcs or '').split(',') %}
+                    {% for name in names %}
+                        {% if name %}
+                        <div>{{ name }}{% if rfcs[loop.index0] is defined and rfcs[loop.index0] %} <small style="color:#666;">— {{ rfcs[loop.index0] }}</small>{% endif %}</div>
+                        {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No hay productos facturados{% if filter_issuer_id %} para este emisor{% endif %} todavía.</p>
     </div>
     {% endif %}
 </div>

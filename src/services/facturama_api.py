@@ -106,30 +106,39 @@ class FacturamaAPI:
         self._call(f"Download CFDI {extension.upper()}", method, cfdi_id, str(file_path))
         return file_path
 
-    def cache_cfdi_result(self, result: dict[str, Any], issuer_id: int | None, request_payload: dict[str, Any]) -> None:
+    def cache_cfdi_result(
+        self,
+        result: dict[str, Any],
+        issuer_id: int | None,
+        request_payload: dict[str, Any],
+        local_data: dict[str, Any] | None = None,
+    ) -> None:
         """Persist a compact local record for listing and audit purposes."""
         if not self.database:
             return
+        local_data = local_data or {}
         receiver = request_payload.get("Receiver", {})
         cfdi_id = str(_first_value(result, "Id", "id", "CfdiId", "cfdi_id"))
         uuid = str(_first_value(result, "Complement", "Uuid", "UUID", "FolioFiscal"))
         if isinstance(result.get("Complement"), dict):
             uuid = str(_first_value(result["Complement"], "TaxStampUuid", "Uuid", "UUID"))
-        self.database.save_cfdi(
-            {
-                "facturama_id": cfdi_id,
-                "uuid": uuid,
-                "issuer_id": issuer_id,
-                "recipient_rfc": receiver.get("Rfc", ""),
-                "recipient_name": receiver.get("Name", ""),
-                "total": _first_value(result, "Total", "total", default=request_payload.get("Total", 0)),
-                "status": _first_value(result, "Status", "status", default="active"),
-                "cfdi_type": request_payload.get("CfdiType", "I"),
-                "payment_form": request_payload.get("PaymentForm", ""),
-                "payment_method": request_payload.get("PaymentMethod", ""),
-                "raw_payload": {"request": request_payload, "response": result},
-            }
-        )
+        cfdi_record = {
+            "facturama_id": cfdi_id,
+            "uuid": uuid,
+            "issuer_id": issuer_id,
+            "client_id": local_data.get("client_id"),
+            "recipient_rfc": receiver.get("Rfc", ""),
+            "recipient_name": receiver.get("Name", ""),
+            "total": _first_value(result, "Total", "total", default=request_payload.get("Total", 0)),
+            "status": _first_value(result, "Status", "status", default="active"),
+            "cfdi_type": request_payload.get("CfdiType", "I"),
+            "payment_form": request_payload.get("PaymentForm", ""),
+            "payment_method": request_payload.get("PaymentMethod", ""),
+            "raw_payload": {"request": request_payload, "response": result},
+        }
+        if "items" in local_data:
+            cfdi_record["items"] = local_data["items"]
+        self.database.save_cfdi(cfdi_record)
 
 
 def build_client_payload(form: dict[str, Any]) -> dict[str, Any]:

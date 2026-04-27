@@ -1,18 +1,83 @@
 """CFDI routes."""
 
-from flask import Blueprint, jsonify, render_template, request, send_file
+from typing import Any
+
+from flask import Blueprint, abort, jsonify, render_template, request, send_file
 
 from src.models import to_dict
-from src.routes.common import api, db, flash_and_redirect, row_or_404
+from src.routes.common import api, db, flash_and_redirect
 from src.services.facturama_api import build_cfdi_payload
 
 bp = Blueprint("cfdi", __name__, url_prefix="/cfdi")
 api_bp = Blueprint("cfdi_api", __name__, url_prefix="/api/cfdi")
 
 
+def _required_int(payload: dict[str, Any], key: str, label: str) -> int:
+    raw_value = payload.get(key)
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} is required") from exc
+
+
+def _load_cfdi_selection(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    database = db()
+    issuer_id = _required_int(payload, "issuer_id", "Issuer")
+    client_id = _required_int(payload, "client_id", "Client")
+    product_id = _required_int(payload, "product_id", "Product")
+
+    issuer = to_dict(database.get_issuer(issuer_id))
+    if issuer is None:
+        raise ValueError("Selected issuer was not found")
+
+    client = to_dict(database.get_client_for_issuer(client_id, issuer_id))
+    if client is None:
+        raise ValueError("Selected client does not belong to selected issuer")
+
+    product = to_dict(database.get_product_for_issuer(product_id, issuer_id))
+    if product is None:
+        raise ValueError("Selected product does not belong to selected issuer")
+
+    return issuer, client, product
+
+
+def _local_cfdi_links(
+    cfdi_payload: dict[str, Any],
+    issuer: dict[str, Any],
+    client: dict[str, Any],
+    product: dict[str, Any],
+) -> dict[str, Any]:
+    item = cfdi_payload["Items"][0]
+    return {
+        "client_id": client["id"],
+        "items": [
+            {
+                "product_id": product["id"],
+                "issuer_id": issuer["id"],
+                "client_id": client["id"],
+                "description": item.get("Description", ""),
+                "name": product.get("name", item.get("Description", "")),
+                "product_code": item.get("ProductCode", ""),
+                "identification_number": item.get("IdentificationNumber", ""),
+                "quantity": item.get("Quantity", 0),
+                "unit_price": item.get("UnitPrice", 0),
+                "subtotal": item.get("Subtotal", 0),
+                "total": item.get("Total", 0),
+            }
+        ],
+    }
+
+
 @bp.get("/")
 def list_cfdis():
-    return render_template("cfdis/list.html", cfdis=db().list_cfdis())
+    recipient_rfc = request.args.get("recipient_rfc", "").strip()
+    status = request.args.get("status", "").strip()
+    return render_template(
+        "cfdis/list.html",
+        cfdis=db().list_cfdis(recipient_rfc=recipient_rfc, status=status),
+        recipient_rfc=recipient_rfc,
+        status=status,
+    )
 
 
 @bp.get("/new")
@@ -28,14 +93,20 @@ def new_cfdi():
 
 @bp.post("/")
 def create_cfdi():
-    database = db()
     payload = request.form.to_dict()
-    issuer = row_or_404(database.get_issuer(int(payload["issuer_id"])), "Issuer not found")
-    client = row_or_404(database.get_client(int(payload["client_id"])), "Client not found")
-    product = row_or_404(database.get_product(int(payload["product_id"])), "Product not found")
+    try:
+        issuer, client, product = _load_cfdi_selection(payload)
+    except ValueError as exc:
+        abort(400, description=str(exc))
     cfdi_payload = build_cfdi_payload(payload, issuer, client, product)
-    result = api().create_cfdi(cfdi_payload)
-    api().cache_cfdi_result(result, issuer["id"], cfdi_payload)
+    portal_api = api()
+    result = portal_api.create_cfdi(cfdi_payload)
+    portal_api.cache_cfdi_result(
+        result,
+        issuer["id"],
+        cfdi_payload,
+        local_data=_local_cfdi_links(cfdi_payload, issuer, client, product),
+    )
     return flash_and_redirect("CFDI emitido.", "cfdi.list_cfdis")
 
 
@@ -83,18 +154,27 @@ def api_list_cfdis():
             "status": request.args.get("status", "all"),
         }
         return jsonify(api().list_cfdis(filters))
-    return jsonify([dict(row) for row in db().list_cfdis()])
+    recipient_rfc = request.args.get("recipient_rfc", "").strip()
+    status = request.args.get("status", "").strip()
+    return jsonify([dict(row) for row in db().list_cfdis(recipient_rfc=recipient_rfc, status=status)])
 
 
 @api_bp.post("/")
 def api_create_cfdi():
     payload = request.get_json() or {}
-    issuer = row_or_404(db().get_issuer(int(payload["issuer_id"])), "Issuer not found")
-    client = row_or_404(db().get_client(int(payload["client_id"])), "Client not found")
-    product = row_or_404(db().get_product(int(payload["product_id"])), "Product not found")
+    try:
+        issuer, client, product = _load_cfdi_selection(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     cfdi_payload = build_cfdi_payload(payload, issuer, client, product)
-    result = api().create_cfdi(cfdi_payload)
-    api().cache_cfdi_result(result, issuer["id"], cfdi_payload)
+    portal_api = api()
+    result = portal_api.create_cfdi(cfdi_payload)
+    portal_api.cache_cfdi_result(
+        result,
+        issuer["id"],
+        cfdi_payload,
+        local_data=_local_cfdi_links(cfdi_payload, issuer, client, product),
+    )
     return jsonify(result), 201
 
 

@@ -9,6 +9,15 @@
 
 <div class="card">
     <form method="post">
+        <div class="form-group">
+            <label for="issuer_id">Emisor *</label>
+            <select id="issuer_id" name="issuer_id" required>
+                <option value="">-- Seleccionar emisor --</option>
+                {% for issuer in issuers %}
+                <option value="{{ issuer.id }}" {{ 'selected' if (product and product.issuer_id == issuer.id) or (not product and selected_issuer_id == issuer.id) else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="form-row">
             <div class="form-group">
                 <label for="name">Nombre *</label>
@@ -49,7 +58,7 @@
         </div>
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if product else 'Crear producto' }}</button>
-            <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Cancelar</a>
+            <a href="{{ url_for('products.list_products', issuer_id=(product.issuer_id if product else selected_issuer_id)) if (product and product.issuer_id) or selected_issuer_id else url_for('products.list_products') }}" class="btn btn-secondary">Cancelar</a>
         </div>
     </form>
 </div>

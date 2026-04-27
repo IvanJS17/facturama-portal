@@ -11,11 +11,11 @@
 <div class="card">
     {# Filters #}
     <form method="get" class="filter-bar">
-        <input type="text" name="search" value="{{ request.args.get('search', '') }}" placeholder="Buscar por RFC o nombre...">
+        <input type="search" name="recipient_rfc" value="{{ recipient_rfc }}" placeholder="Buscar por RFC receptor..." aria-label="RFC receptor">
         <select name="status">
             <option value="">Todos los estados</option>
-            <option value="active" {{ 'selected' if request.args.get('status') == 'active' else '' }}>Activos</option>
-            <option value="canceled" {{ 'selected' if request.args.get('status') == 'canceled' else '' }}>Cancelados</option>
+            <option value="active" {{ 'selected' if status == 'active' else '' }}>Activos</option>
+            <option value="canceled" {{ 'selected' if status == 'canceled' else '' }}>Cancelados</option>
         </select>
         <button type="submit" class="btn btn-secondary">Filtrar</button>
         <a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-secondary">Limpiar</a>
@@ -55,8 +55,12 @@
     </table>
     {% else %}
     <div class="empty-state">
+        {% if recipient_rfc or status %}
+        <p>No hay CFDIs que coincidan con los filtros.</p>
+        {% else %}
         <p>No hay CFDIs registrados.</p>
         <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Crear primera factura</a>
+        {% endif %}
     </div>
     {% endif %}
 </div>

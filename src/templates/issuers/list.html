@@ -31,6 +31,8 @@
                 <td><span class="badge badge-{{ 'active' if issuer.active else 'canceled' }}">{{ 'Sí' if issuer.active else 'No' }}</span></td>
                 <td>
                     <a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Editar</a>
+                    <a href="{{ url_for('clients.list_clients', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Ver clientes</a>
+                    <a href="{{ url_for('clients.new_client', issuer_id=issuer.id) }}" class="btn btn-sm btn-primary">Agregar cliente</a>
                     <form method="post" action="{{ url_for('issuers.delete_issuer', issuer_id=issuer.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar emisor?');">
                         <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
                     </form>

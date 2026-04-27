@@ -14,7 +14,7 @@
             <select id="issuer_id" name="issuer_id" required>
                 <option value="">-- Seleccionar emisor --</option>
                 {% for issuer in issuers %}
-                <option value="{{ issuer.id }}" {{ 'selected' if client and client.issuer_id == issuer.id else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
+                <option value="{{ issuer.id }}" {{ 'selected' if (client and client.issuer_id == issuer.id) or (not client and selected_issuer_id == issuer.id) else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -87,7 +87,7 @@
         </div>
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if client else 'Crear cliente' }}</button>
-            <a href="{{ url_for('clients.list_clients') }}" class="btn btn-secondary">Cancelar</a>
+            <a href="{{ url_for('clients.list_clients', issuer_id=(client.issuer_id if client else selected_issuer_id)) if (client and client.issuer_id) or selected_issuer_id else url_for('clients.list_clients') }}" class="btn btn-secondary">Cancelar</a>
         </div>
     </form>
 </div>
