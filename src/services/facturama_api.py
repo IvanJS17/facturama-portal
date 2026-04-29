@@ -91,8 +91,10 @@ class FacturamaAPI:
     def cancel_cfdi(self, cfdi_id: str, motive: str = "02", uuid_replacement: str = "") -> Any:
         return self._call("Cancel CFDI", CfdiMultiEmisor.delete, cfdi_id, motive, uuid_replacement or None)
 
-    def download_cfdi(self, cfdi_id: str, file_type: str, output_dir: str = "downloads") -> Path:
-        output = Path(output_dir)
+    def download_cfdi(self, cfdi_id: str, file_type: str, output_dir: str | Path | None = None) -> Path:
+        base_dir = Path(__file__).resolve().parents[2]
+        output = Path(output_dir) if output_dir is not None else base_dir / "downloads"
+        output = output.expanduser().resolve()
         output.mkdir(parents=True, exist_ok=True)
         extension = file_type.lower()
         if extension not in {"pdf", "xml", "html"}:
@@ -104,6 +106,8 @@ class FacturamaAPI:
             "html": CfdiMultiEmisor.saveAsHtml,
         }[extension]
         self._call(f"Download CFDI {extension.upper()}", method, cfdi_id, str(file_path))
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Downloaded CFDI file not found: {file_path}")
         return file_path
 
     def cache_cfdi_result(

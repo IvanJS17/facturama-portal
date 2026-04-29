@@ -6,7 +6,7 @@ from flask import Blueprint, abort, jsonify, render_template, request, send_file
 
 from src.models import to_dict
 from src.routes.common import api, db, flash_and_redirect
-from src.services.facturama_api import build_cfdi_payload
+from src.services.facturama_api import FacturamaAPIError, build_cfdi_payload
 
 bp = Blueprint("cfdi", __name__, url_prefix="/cfdi")
 api_bp = Blueprint("cfdi_api", __name__, url_prefix="/api/cfdi")
@@ -134,14 +134,32 @@ def cancel_cfdi(cfdi_id: int):
 @bp.get("/<int:cfdi_id>/pdf")
 def cfdi_pdf(cfdi_id: int):
     cfdi_record = to_dict(db().get_cfdi(cfdi_id))
-    file_path = api().download_cfdi(str(cfdi_record.get("facturama_id", cfdi_id)), "pdf")
+    try:
+        file_path = api().download_cfdi(str(cfdi_record.get("facturama_id", cfdi_id)), "pdf")
+    except FileNotFoundError:
+        abort(404, description="PDF file not found")
+    except FacturamaAPIError as exc:
+        if "404" in str(exc):
+            abort(404, description="PDF file not found")
+        raise
+    if not file_path.is_file():
+        abort(404, description="PDF file not found")
     return send_file(file_path, as_attachment=True)
 
 
 @bp.get("/<int:cfdi_id>/xml")
 def cfdi_xml(cfdi_id: int):
     cfdi_record = to_dict(db().get_cfdi(cfdi_id))
-    file_path = api().download_cfdi(str(cfdi_record.get("facturama_id", cfdi_id)), "xml")
+    try:
+        file_path = api().download_cfdi(str(cfdi_record.get("facturama_id", cfdi_id)), "xml")
+    except FileNotFoundError:
+        abort(404, description="XML file not found")
+    except FacturamaAPIError as exc:
+        if "404" in str(exc):
+            abort(404, description="XML file not found")
+        raise
+    if not file_path.is_file():
+        abort(404, description="XML file not found")
     return send_file(file_path, as_attachment=True)
 
 
