@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import base64
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +109,34 @@ class FacturamaAPI:
         self._call(f"Download CFDI {extension.upper()}", method, cfdi_id, str(file_path))
         if not file_path.is_file():
             raise FileNotFoundError(f"Downloaded CFDI file not found: {file_path}")
+        return file_path
+
+    def download_cfdi_acuse(self, cfdi_id: str, file_type: str, output_dir: str | Path | None = None) -> Path:
+        base_dir = Path(__file__).resolve().parents[2]
+        output = Path(output_dir) if output_dir is not None else base_dir / "downloads"
+        output = output.expanduser().resolve()
+        output.mkdir(parents=True, exist_ok=True)
+        extension = file_type.lower()
+        if extension not in {"pdf", "html"}:
+            raise ValueError("file_type must be pdf or html")
+
+        response = self._call(
+            f"Download CFDI acuse {extension.upper()}",
+            CfdiMultiEmisor.build_http_request,
+            "get",
+            f"Acuse/{extension}/issuedLite/{cfdi_id}",
+            version=0,
+        )
+
+        if not isinstance(response, dict) or not response.get("Content"):
+            raise FacturamaAPIError("Download CFDI acuse failed: empty response content")
+
+        file_path = output / f"{cfdi_id}.acuse.{extension}"
+        with open(file_path, "wb") as file:
+            file.write(base64.urlsafe_b64decode(response["Content"].encode("utf-8")))
+
+        if not file_path.is_file():
+            raise FileNotFoundError(f"Downloaded CFDI acuse file not found: {file_path}")
         return file_path
 
     def cache_cfdi_result(

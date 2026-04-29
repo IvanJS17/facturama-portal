@@ -163,14 +163,44 @@ def cfdi_xml(cfdi_id: int):
     return send_file(file_path, as_attachment=True)
 
 
+@bp.get("/<int:cfdi_id>/acuse/<string:file_format>")
+def cfdi_acuse(cfdi_id: int, file_format: str):
+    if file_format.lower() not in {"pdf", "html"}:
+        abort(400, description="Invalid format. Use pdf or html.")
+    cfdi_record = to_dict(db().get_cfdi(cfdi_id))
+    try:
+        file_path = api().download_cfdi_acuse(str(cfdi_record.get("facturama_id", cfdi_id)), file_format)
+    except FileNotFoundError:
+        abort(404, description="Cancellation acknowledgment file not found")
+    except FacturamaAPIError as exc:
+        if "404" in str(exc):
+            abort(404, description="Cancellation acknowledgment file not found")
+        raise
+    if not file_path.is_file():
+        abort(404, description="Cancellation acknowledgment file not found")
+    return send_file(file_path, as_attachment=True)
+
+
 @api_bp.get("/")
 def api_list_cfdis():
     if request.args.get("remote"):
-        filters = {
-            "type": request.args.get("type", "issued"),
-            "keyword": request.args.get("keyword", ""),
-            "status": request.args.get("status", "all"),
-        }
+        filters = {"type": request.args.get("type", "issuedLite")}
+        for key in (
+            "status",
+            "folio",
+            "folioStart",
+            "folioEnd",
+            "dateStart",
+            "dateEnd",
+            "rfcIssuer",
+            "rfc",
+            "taxEntityName",
+            "orderNumber",
+            "page",
+        ):
+            value = request.args.get(key)
+            if value not in (None, ""):
+                filters[key] = value
         return jsonify(api().list_cfdis(filters))
     recipient_rfc = request.args.get("recipient_rfc", "").strip()
     status = request.args.get("status", "").strip()
