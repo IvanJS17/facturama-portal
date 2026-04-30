@@ -57,7 +57,7 @@
             <select id="product_id" name="product_id" required>
                 <option value="">-- Seleccionar producto --</option>
                 {% for product in products %}
-                <option value="{{ product.id }}" data-issuer-id="{{ product.issuer_id }}" data-price="{{ product.price }}" data-name="{{ product.name }}" data-code="{{ product.product_code }}" data-unit="{{ product.unit }}" data-unit-code="{{ product.unit_code }}" data-tax-object="{{ product.tax_object }}">{{ product.name }} — ${{ "%.2f"|format(product.price) }}</option>
+                <option value="{{ product.id }}" data-issuer-id="{{ product.issuer_id or '' }}" data-price="{{ product.price }}" data-name="{{ product.name }}" data-code="{{ product.product_code }}" data-unit="{{ product.unit }}" data-unit-code="{{ product.unit_code }}" data-tax-object="{{ product.tax_object }}">{{ product.name }} — ${{ "%.2f"|format(product.price) }}</option>
                 {% endfor %}
             </select>
         </div>

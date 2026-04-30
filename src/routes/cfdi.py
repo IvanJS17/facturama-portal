@@ -39,7 +39,7 @@ def _load_cfdi_selection(
 
     product = to_dict(database.get_product_for_issuer(product_id, issuer_id))
     if product is None:
-        raise ValueError("Selected product does not belong to selected issuer")
+        raise ValueError(f"Selected product (id={product_id}) does not belong to selected issuer (id={issuer_id})")
 
     series = to_dict(database.get_series(series_id))
     if series is None:
@@ -138,7 +138,14 @@ def cfdi_detail(cfdi_id: int):
     remote_record = None
     if request.args.get("refresh"):
         remote_record = api().get_cfdi(str(local_record.get("facturama_id", cfdi_id)))
-    return render_template("cfdis/detail.html", cfdi=local_record, remote_record=remote_record, cfdi_id=cfdi_id)
+    items = db().get_cfdi_items(cfdi_id)
+    return render_template(
+        "cfdis/detail.html",
+        cfdi=local_record,
+        remote_record=remote_record,
+        cfdi_id=cfdi_id,
+        items=items,
+    )
 
 
 @bp.post("/<int:cfdi_id>/cancel")

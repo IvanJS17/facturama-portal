@@ -74,6 +74,18 @@
 <div class="card">
     <h2>Productos facturados</h2>
     <p class="page-subtitle">Historial real por emisor: producto → emisor → clientes a los que se facturó.</p>
+    <form method="get" class="filter-bar" style="margin-bottom:1rem;">
+        <label style="font-weight:600;">Filtrar por emisor:</label>
+        <select name="issuer_id" onchange="this.form.submit()">
+            <option value="">— Todos los emisores —</option>
+            {% for issuer in issuers %}
+            <option value="{{ issuer.id }}" {{ 'selected' if filter_issuer_id == issuer.id else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
+            {% endfor %}
+        </select>
+        {% if filter_issuer_id %}
+        <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Limpiar filtro</a>
+        {% endif %}
+    </form>
 
     {% if invoiced_products %}
     <table>

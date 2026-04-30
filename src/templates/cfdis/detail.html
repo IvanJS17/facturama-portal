@@ -66,6 +66,40 @@
     </div>
 </div>
 
+{% if items %}
+<div class="card">
+    <h2>Conceptos / Productos</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Código</th>
+                <th>Identificación</th>
+                <th>Unidad</th>
+                <th>Cant</th>
+                <th>Precio Unit</th>
+                <th>Subtotal</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in items %}
+            <tr>
+                <td>{{ item.product_name or item.name or item.description or '—' }}</td>
+                <td>{{ item.product_code or '—' }}</td>
+                <td>{{ item.identification_number or '—' }}</td>
+                <td>{{ item.unit or item.product_unit or '—' }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>${{ "%.2f"|format(item.unit_price or 0) }}</td>
+                <td>${{ "%.2f"|format(item.subtotal or 0) }}</td>
+                <td>${{ "%.2f"|format(item.total or 0) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 {% if cfdi.raw_payload %}
 <div class="card">
     <h2>Datos originales del CFDI</h2>

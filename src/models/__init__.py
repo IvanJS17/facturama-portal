@@ -786,6 +786,24 @@ class PortalDatabase:
                 (cfdi_id,),
             ).fetchone()
 
+    def get_cfdi_items(self, cfdi_id: int) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    ci.*,
+                    p.name AS product_name,
+                    p.product_code AS product_code,
+                    p.identification_number AS identification_number,
+                    p.unit AS product_unit
+                FROM cfdi_items ci
+                LEFT JOIN products p ON p.id = ci.product_id
+                WHERE ci.cfdi_id = ?
+                ORDER BY ci.id ASC
+                """,
+                (cfdi_id,),
+            ).fetchall()
+
     def save_cfdi(self, data: dict[str, Any]) -> int:
         now = utc_now()
         facturama_id = str(data.get("facturama_id") or data.get("Id") or data.get("id") or "")
