@@ -68,7 +68,8 @@
     <div class="card">
         <h2>Últimos CFDIs</h2>
         {% if cfdis %}
-        <table>
+        <div class="dashboard-cfdi-table-scroll">
+        <table class="dashboard-cfdi-table">
             <thead><tr><th>Emisor</th><th>Cliente</th><th>RFC</th><th>Folio</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
             {% for cfdi in cfdis[:5] %}
@@ -90,6 +91,7 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
         {% if cfdis|length > 5 %}<p style="margin-top:0.5rem;font-size:0.85rem;color:#888;">Y {{ cfdis|length - 5 }} más...</p>{% endif %}
         {% else %}
         <div class="empty-state"><p>No hay CFDIs. <a href="{{ url_for('cfdi.new_cfdi') }}">Crear el primero</a></p></div>

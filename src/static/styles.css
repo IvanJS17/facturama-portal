@@ -61,6 +61,26 @@ tbody tr:hover { background: #fafafa; }
 tbody a { color: #1a1a2e; text-decoration: none; }
 tbody a:hover { text-decoration: underline; }
 
+/* Dashboard CFDIs table */
+.dashboard-cfdi-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.dashboard-cfdi-table {
+    min-width: 860px;
+}
+
+.dashboard-cfdi-table th,
+.dashboard-cfdi-table td {
+    white-space: nowrap;
+}
+
+.dashboard-cfdi-table th:nth-child(4),
+.dashboard-cfdi-table td:nth-child(4) {
+    width: 110px;
+}
+
 /* Badges */
 .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
 .badge-active { background: #d4edda; color: #155724; }
