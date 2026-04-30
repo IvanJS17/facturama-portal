@@ -69,12 +69,20 @@
         <h2>Últimos CFDIs</h2>
         {% if cfdis %}
         <table>
-            <thead><tr><th>Folio</th><th>Receptor</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Emisor</th><th>Cliente</th><th>RFC</th><th>Folio</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
             {% for cfdi in cfdis[:5] %}
                 <tr>
-                    <td>{{ cfdi.facturama_id }}</td>
+                    <td><strong>{{ cfdi.issuer_name or cfdi.issuer_rfc }}</strong></td>
+                    <td>{{ cfdi.client_name or cfdi.recipient_name }}</td>
                     <td>{{ cfdi.recipient_rfc }}</td>
+                    <td>
+                        {% if cfdi.folio is not none %}
+                            {{ '...' ~ ('%04d'|format(cfdi.folio|int))[-4:] }}
+                        {% else %}
+                            {{ '...' ~ (cfdi.facturama_id|string)[-6:] }}
+                        {% endif %}
+                    </td>
                     <td>${{ "%.2f"|format(cfdi.total) }}</td>
                     <td><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}">{{ cfdi.status }}</span></td>
                     <td><a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}" class="btn btn-sm btn-secondary">Ver</a></td>
