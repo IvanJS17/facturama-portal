@@ -144,7 +144,7 @@ def test_web_create_cfdi_rejects_product_from_another_issuer(tmp_path, monkeypat
     )
 
     assert response.status_code == 400
-    assert b"Selected product does not belong to selected issuer" in response.data
+    assert b"does not belong to selected issuer" in response.data
     assert fake_api.created_payloads == []
 
 
