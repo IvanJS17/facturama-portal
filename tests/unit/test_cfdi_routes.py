@@ -96,6 +96,7 @@ def cfdi_payload(issuer_id, client_id, product_id):
         "issuer_id": issuer_id,
         "client_id": client_id,
         "product_id": product_id,
+        "series_id": 0,
         "quantity": 2,
         "unit_price": 125,
         "iva_rate": 0.16,
@@ -105,15 +106,22 @@ def cfdi_payload(issuer_id, client_id, product_id):
     }
 
 
+def ensure_series(database, issuer_id, name="FAC", start_folio=1):
+    return database.create_series(issuer_id, name, start_folio)
+
+
 def test_api_create_cfdi_rejects_client_from_another_issuer(tmp_path, monkeypatch):
     database = make_db(tmp_path)
     issuer_a, _, _, client_b, product_a, _ = seed_two_issuers(database)
+    series_id = ensure_series(database, issuer_a)
     fake_api = FakeCfdiAPI(database)
     app = make_app(database, fake_api, monkeypatch)
+    payload = cfdi_payload(issuer_a, client_b, product_a)
+    payload["series_id"] = series_id
 
     response = app.test_client().post(
         "/api/cfdi/",
-        json=cfdi_payload(issuer_a, client_b, product_a),
+        json=payload,
     )
 
     assert response.status_code == 400
@@ -124,12 +132,15 @@ def test_api_create_cfdi_rejects_client_from_another_issuer(tmp_path, monkeypatc
 def test_web_create_cfdi_rejects_product_from_another_issuer(tmp_path, monkeypatch):
     database = make_db(tmp_path)
     issuer_a, _, client_a, _, _, product_b = seed_two_issuers(database)
+    series_id = ensure_series(database, issuer_a)
     fake_api = FakeCfdiAPI(database)
     app = make_app(database, fake_api, monkeypatch)
+    payload = cfdi_payload(issuer_a, client_a, product_b)
+    payload["series_id"] = series_id
 
     response = app.test_client().post(
         "/cfdi/",
-        data=cfdi_payload(issuer_a, client_a, product_b),
+        data=payload,
     )
 
     assert response.status_code == 400
@@ -140,12 +151,15 @@ def test_web_create_cfdi_rejects_product_from_another_issuer(tmp_path, monkeypat
 def test_api_create_cfdi_persists_client_and_item_links(tmp_path, monkeypatch):
     database = make_db(tmp_path)
     issuer_a, _, client_a, _, product_a, _ = seed_two_issuers(database)
+    series_id = ensure_series(database, issuer_a, "FAC", 10)
     fake_api = FakeCfdiAPI(database)
     app = make_app(database, fake_api, monkeypatch)
+    payload = cfdi_payload(issuer_a, client_a, product_a)
+    payload["series_id"] = series_id
 
     response = app.test_client().post(
         "/api/cfdi/",
-        json=cfdi_payload(issuer_a, client_a, product_a),
+        json=payload,
     )
 
     assert response.status_code == 201
@@ -154,6 +168,8 @@ def test_api_create_cfdi_persists_client_and_item_links(tmp_path, monkeypatch):
     assert cfdis[0]["client_id"] == client_a
     assert cfdis[0]["issuer_id"] == issuer_a
     assert cfdis[0]["total"] == 290
+    assert cfdis[0]["serie"] == "FAC"
+    assert cfdis[0]["folio"] == 10
 
     with database.connect() as conn:
         item = conn.execute("SELECT * FROM cfdi_items WHERE cfdi_id = ?", (cfdis[0]["id"],)).fetchone()
@@ -164,3 +180,5 @@ def test_api_create_cfdi_persists_client_and_item_links(tmp_path, monkeypatch):
     assert item["unit_price"] == 125
     assert item["subtotal"] == 250
     assert item["total"] == 290
+    assert fake_api.created_payloads[0]["Serie"] == "FAC"
+    assert fake_api.created_payloads[0]["Folio"] == "10"

@@ -20,11 +20,14 @@ def _required_int(payload: dict[str, Any], key: str, label: str) -> int:
         raise ValueError(f"{label} is required") from exc
 
 
-def _load_cfdi_selection(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def _load_cfdi_selection(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     database = db()
     issuer_id = _required_int(payload, "issuer_id", "Issuer")
     client_id = _required_int(payload, "client_id", "Client")
     product_id = _required_int(payload, "product_id", "Product")
+    series_id = _required_int(payload, "series_id", "Series")
 
     issuer = to_dict(database.get_issuer(issuer_id))
     if issuer is None:
@@ -38,7 +41,13 @@ def _load_cfdi_selection(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[
     if product is None:
         raise ValueError("Selected product does not belong to selected issuer")
 
-    return issuer, client, product
+    series = to_dict(database.get_series(series_id))
+    if series is None:
+        raise ValueError("Selected series was not found")
+    if int(series["issuer_id"]) != issuer_id:
+        raise ValueError("Selected series does not belong to selected issuer")
+
+    return issuer, client, product, series
 
 
 def _local_cfdi_links(
@@ -83,11 +92,21 @@ def list_cfdis():
 @bp.get("/new")
 def new_cfdi():
     database = db()
+    issuers = database.list_issuers()
+    for issuer in issuers:
+        if not database.list_series(int(issuer["id"])):
+            database.create_series(int(issuer["id"]), "FAC", 1)
+
+    all_series: list[Any] = []
+    for issuer in issuers:
+        all_series.extend(database.list_series(int(issuer["id"])))
+
     return render_template(
         "cfdis/new.html",
-        issuers=database.list_issuers(),
+        issuers=issuers,
         clients=database.list_clients(),
         products=database.list_products(),
+        series_list=all_series,
     )
 
 
@@ -95,9 +114,12 @@ def new_cfdi():
 def create_cfdi():
     payload = request.form.to_dict()
     try:
-        issuer, client, product = _load_cfdi_selection(payload)
+        issuer, client, product, series = _load_cfdi_selection(payload)
     except ValueError as exc:
         abort(400, description=str(exc))
+    folio = db().get_next_folio(int(issuer["id"]), str(series["series"]))
+    payload["serie"] = str(series["series"])
+    payload["folio"] = str(folio)
     cfdi_payload = build_cfdi_payload(payload, issuer, client, product)
     portal_api = api()
     result = portal_api.create_cfdi(cfdi_payload)
@@ -211,9 +233,12 @@ def api_list_cfdis():
 def api_create_cfdi():
     payload = request.get_json() or {}
     try:
-        issuer, client, product = _load_cfdi_selection(payload)
+        issuer, client, product, series = _load_cfdi_selection(payload)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    folio = db().get_next_folio(int(issuer["id"]), str(series["series"]))
+    payload["serie"] = str(series["series"])
+    payload["folio"] = str(folio)
     cfdi_payload = build_cfdi_payload(payload, issuer, client, product)
     portal_api = api()
     result = portal_api.create_cfdi(cfdi_payload)

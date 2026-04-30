@@ -74,4 +74,47 @@
         </div>
     </form>
 </div>
+{% if issuer %}
+<div class="card">
+    <h2 style="font-size:1rem;margin-bottom:0.75rem;color:#1a1a2e;border:none;">Series de facturación</h2>
+    {% if series_list %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Serie</th>
+                <th>Siguiente folio</th>
+                <th>Activa</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for series in series_list %}
+            <tr>
+                <td>{{ series.series }}</td>
+                <td>{{ series.next_folio }}</td>
+                <td>{{ 'Sí' if series.active else 'No' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No hay series registradas para este emisor.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('issuers.create_series', issuer_id=issuer.id) }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="series">Nueva serie *</label>
+                <input type="text" id="series" name="series" value="FAC" required maxlength="10">
+            </div>
+            <div class="form-group">
+                <label for="start_folio">Folio inicial *</label>
+                <input type="number" id="start_folio" name="start_folio" value="1" min="1" step="1" required>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Crear serie</button>
+        </div>
+    </form>
+</div>
+{% endif %}
 {% endblock %}

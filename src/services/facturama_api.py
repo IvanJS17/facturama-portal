@@ -167,6 +167,8 @@ class FacturamaAPI:
             "cfdi_type": request_payload.get("CfdiType", "I"),
             "payment_form": request_payload.get("PaymentForm", ""),
             "payment_method": request_payload.get("PaymentMethod", ""),
+            "serie": request_payload.get("Serie", "FAC"),
+            "folio": int(request_payload.get("Folio", 1) or 1),
             "raw_payload": {"request": request_payload, "response": result},
         }
         if "items" in local_data:
@@ -217,6 +219,8 @@ def build_cfdi_payload(
     return {
         "NameId": form.get("name_id", "1").strip(),
         "CfdiType": form.get("cfdi_type", "I").strip(),
+        "Serie": form.get("serie", "FAC").strip(),
+        "Folio": str(form.get("folio", "1")).strip(),
         "ExpeditionPlace": issuer["zip_code"],
         "PaymentForm": form.get("payment_form", "03").strip(),
         "PaymentMethod": form.get("payment_method", "PUE").strip(),

@@ -15,7 +15,7 @@ def list_issuers():
 
 @bp.get("/new")
 def new_issuer():
-    return render_template("issuers/form.html", issuer=None)
+    return render_template("issuers/form.html", issuer=None, series_list=[])
 
 
 @bp.post("/")
@@ -27,7 +27,7 @@ def create_issuer():
 @bp.get("/<int:issuer_id>/edit")
 def edit_issuer(issuer_id: int):
     issuer = row_or_404(db().get_issuer(issuer_id), "Issuer not found")
-    return render_template("issuers/form.html", issuer=issuer)
+    return render_template("issuers/form.html", issuer=issuer, series_list=db().list_series(issuer_id))
 
 
 @bp.post("/<int:issuer_id>")
@@ -42,6 +42,19 @@ def update_issuer(issuer_id: int):
 def delete_issuer(issuer_id: int):
     db().delete_issuer(issuer_id)
     return flash_and_redirect("Emisor eliminado.", "issuers.list_issuers")
+
+
+@bp.post("/<int:issuer_id>/series")
+def create_series(issuer_id: int):
+    row_or_404(db().get_issuer(issuer_id), "Issuer not found")
+    series = request.form.get("series", "FAC")
+    start_folio_raw = request.form.get("start_folio", "1")
+    try:
+        start_folio = max(int(start_folio_raw), 1)
+    except ValueError:
+        start_folio = 1
+    db().create_series(issuer_id, series, start_folio=start_folio)
+    return flash_and_redirect("Serie creada.", "issuers.edit_issuer", issuer_id=issuer_id)
 
 
 @api_bp.get("/")

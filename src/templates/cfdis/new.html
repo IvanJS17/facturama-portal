@@ -20,6 +20,23 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="series_id">Serie *</label>
+                <select id="series_id" name="series_id" required>
+                    <option value="">-- Seleccionar serie --</option>
+                    {% for series in series_list %}
+                    <option value="{{ series.id }}" data-issuer-id="{{ series.issuer_id }}" data-series="{{ series.series }}">
+                        {{ series.series }} (siguiente: {{ series.next_folio }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="folio">Folio</label>
+                <input type="text" id="folio" name="folio" value="Auto-asignado" readonly>
+            </div>
+        </div>
 
         {# Receptor #}
         <h2 style="font-size:1rem;margin:1rem 0 0.75rem;color:#1a1a2e;border:none;">Receptor</h2>
@@ -122,6 +139,7 @@ const ivaSelect = document.getElementById('iva_rate');
 const descInput = document.getElementById('description');
 const issuerSelect = document.getElementById('issuer_id');
 const clientSelect = document.getElementById('client_id');
+const seriesSelect = document.getElementById('series_id');
 
 function calc() {
     const qty = parseFloat(qtyInput.value) || 0;
@@ -175,6 +193,7 @@ function filterScopedSelect(selectEl) {
 }
 
 function filterIssuerScopedFields() {
+    filterScopedSelect(seriesSelect);
     filterScopedSelect(clientSelect);
     filterScopedSelect(productSelect);
     calc();

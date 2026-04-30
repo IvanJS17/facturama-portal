@@ -165,6 +165,7 @@ class PortalDatabase:
                 self._migrate_products(conn)
                 self._migrate_cfdis(conn)
                 self._ensure_cfdi_items(conn)
+                self._ensure_invoice_series(conn)
             finally:
                 conn.execute("PRAGMA foreign_keys = ON")
 
@@ -301,6 +302,8 @@ class PortalDatabase:
             not exists
             or "client_id" not in columns
             or "issuer_id" not in columns
+            or "serie" not in columns
+            or "folio" not in columns
             or "FOREIGN KEY (client_id) REFERENCES clients(id)" not in _table_sql(conn, "cfdis")
         )
         if not needs_rebuild:
@@ -321,6 +324,8 @@ class PortalDatabase:
                 cfdi_type TEXT NOT NULL DEFAULT 'I',
                 payment_form TEXT NOT NULL DEFAULT '',
                 payment_method TEXT NOT NULL DEFAULT '',
+                serie TEXT NOT NULL DEFAULT 'FAC',
+                folio INTEGER NOT NULL DEFAULT 1,
                 raw_payload TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
@@ -331,16 +336,34 @@ class PortalDatabase:
         )
         if exists:
             client_id_sql = "client_id" if "client_id" in columns else "NULL"
+            serie_sql = "serie" if "serie" in columns else "'FAC'"
+            folio_sql = "folio" if "folio" in columns else "1"
             conn.execute(
                 f"""
                 INSERT INTO cfdis_migrated
                     (id, facturama_id, uuid, issuer_id, client_id, recipient_rfc,
-                     recipient_name, total, status, cfdi_type, payment_form,
-                     payment_method, raw_payload, created_at, updated_at)
+                     recipient_name, total, status, cfdi_type, payment_form, payment_method,
+                     serie, folio,
+                     raw_payload, created_at, updated_at)
                 SELECT id, facturama_id, uuid, issuer_id, {client_id_sql}, recipient_rfc,
-                       recipient_name, total, status, cfdi_type, payment_form,
-                       payment_method, raw_payload, created_at, updated_at
+                       recipient_name, total, status, cfdi_type, payment_form, payment_method,
+                       {serie_sql}, {folio_sql},
+                       raw_payload, created_at, updated_at
                 FROM cfdis
+                """
+            )
+            conn.execute(
+                """
+                UPDATE cfdis_migrated
+                SET folio = 1
+                WHERE folio IS NULL OR folio < 1
+                """
+            )
+            conn.execute(
+                """
+                UPDATE cfdis_migrated
+                SET serie = 'FAC'
+                WHERE TRIM(COALESCE(serie, '')) = ''
                 """
             )
             conn.execute(
@@ -359,6 +382,83 @@ class PortalDatabase:
             )
             conn.execute("DROP TABLE cfdis")
         conn.execute("ALTER TABLE cfdis_migrated RENAME TO cfdis")
+
+    def _ensure_invoice_series(self, conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS invoice_series (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer_id INTEGER NOT NULL,
+                series TEXT NOT NULL DEFAULT 'FAC',
+                next_folio INTEGER NOT NULL DEFAULT 1,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (issuer_id) REFERENCES issuers(id),
+                UNIQUE(issuer_id, series)
+            );
+            """
+        )
+
+    def list_series(self, issuer_id: int) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT *
+                FROM invoice_series
+                WHERE issuer_id = ?
+                ORDER BY active DESC, series
+                """,
+                (issuer_id,),
+            ).fetchall()
+
+    def create_series(self, issuer_id: int, series: str, start_folio: int = 1) -> int:
+        cleaned_series = (series or "FAC").strip().upper()
+        if not cleaned_series:
+            cleaned_series = "FAC"
+        safe_start_folio = max(int(start_folio or 1), 1)
+        now = utc_now()
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO invoice_series
+                    (issuer_id, series, next_folio, active, created_at, updated_at)
+                VALUES (?, ?, ?, 1, ?, ?)
+                """,
+                (issuer_id, cleaned_series, safe_start_folio, now, now),
+            )
+            return int(cursor.lastrowid)
+
+    def get_series(self, series_id: int) -> sqlite3.Row | None:
+        with self.connect() as conn:
+            return conn.execute("SELECT * FROM invoice_series WHERE id = ?", (series_id,)).fetchone()
+
+    def get_next_folio(self, issuer_id: int, series: str) -> int:
+        cleaned_series = (series or "FAC").strip().upper()
+        if not cleaned_series:
+            cleaned_series = "FAC"
+        with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                """
+                SELECT id, next_folio
+                FROM invoice_series
+                WHERE issuer_id = ? AND series = ? AND active = 1
+                """,
+                (issuer_id, cleaned_series),
+            ).fetchone()
+            if row is None:
+                raise ValueError("Invoice series not found for issuer")
+            current_folio = max(int(row["next_folio"] or 1), 1)
+            conn.execute(
+                """
+                UPDATE invoice_series
+                SET next_folio = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (current_folio + 1, utc_now(), int(row["id"])),
+            )
+            return current_folio
 
     def _ensure_cfdi_items(self, conn: sqlite3.Connection) -> None:
         conn.executescript(
@@ -709,9 +809,9 @@ class PortalDatabase:
                 """
                 INSERT INTO cfdis
                     (facturama_id, uuid, issuer_id, client_id, recipient_rfc, recipient_name, total,
-                     status, cfdi_type, payment_form, payment_method, raw_payload,
+                     status, cfdi_type, payment_form, payment_method, serie, folio, raw_payload,
                      created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(facturama_id) DO UPDATE SET
                     uuid = excluded.uuid,
                     issuer_id = excluded.issuer_id,
@@ -723,6 +823,8 @@ class PortalDatabase:
                     cfdi_type = excluded.cfdi_type,
                     payment_form = excluded.payment_form,
                     payment_method = excluded.payment_method,
+                    serie = excluded.serie,
+                    folio = excluded.folio,
                     raw_payload = excluded.raw_payload,
                     updated_at = excluded.updated_at
                 """,
@@ -738,6 +840,8 @@ class PortalDatabase:
                     data.get("cfdi_type", "I"),
                     data.get("payment_form", ""),
                     data.get("payment_method", ""),
+                    str(data.get("serie", "FAC")).strip().upper() or "FAC",
+                    max(int(data.get("folio") or 1), 1),
                     raw_payload,
                     now,
                     now,

@@ -63,11 +63,14 @@ def test_fresh_schema_has_required_issuer_scoped_columns(tmp_path):
     product_columns = column_info(database, "products")
     cfdi_columns = column_info(database, "cfdis")
     item_columns = column_info(database, "cfdi_items")
+    series_columns = column_info(database, "invoice_series")
 
     assert client_columns["issuer_id"]["notnull"] == 1
     assert product_columns["issuer_id"]["notnull"] == 1
     assert "client_id" in cfdi_columns
+    assert {"serie", "folio"} <= set(cfdi_columns)
     assert {"cfdi_id", "product_id", "issuer_id", "client_id", "total"} <= set(item_columns)
+    assert {"issuer_id", "series", "next_folio", "active"} <= set(series_columns)
 
     with database.connect() as conn:
         client_indexes = conn.execute("PRAGMA index_list(clients)").fetchall()
@@ -271,3 +274,25 @@ def test_cfdi_item_rejects_product_from_another_issuer(tmp_path):
 
     with pytest.raises(ValueError, match="product does not belong to issuer"):
         database.save_cfdi_item(cfdi_id, {"product_id": product_b, "issuer_id": issuer_a})
+
+
+def test_invoice_series_create_list_and_increment(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))
+    series_id = database.create_series(issuer_id, "fac", 25)
+
+    series = database.get_series(series_id)
+    assert series is not None
+    assert series["issuer_id"] == issuer_id
+    assert series["series"] == "FAC"
+    assert series["next_folio"] == 25
+
+    listed = database.list_series(issuer_id)
+    assert len(listed) == 1
+    assert listed[0]["id"] == series_id
+
+    folio_1 = database.get_next_folio(issuer_id, "FAC")
+    folio_2 = database.get_next_folio(issuer_id, "FAC")
+    assert folio_1 == 25
+    assert folio_2 == 26
+    assert database.get_series(series_id)["next_folio"] == 27
