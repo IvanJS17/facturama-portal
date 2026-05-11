@@ -210,6 +210,193 @@ flask routes
 flask shell
 ```
 
+## Puesta en producción
+
+Esta guía cubre el proceso completo para migrar de sandbox a producción, tanto para humanos como para agentes AI. Asume que el proyecto ya está clonado y las dependencias instaladas según la sección de Instalación.
+
+---
+
+### Para humanos
+
+#### 1. Archivo `.env` de producción
+
+Reemplazar las credenciales de sandbox por las de producción:
+
+```env
+# Facturama API (PRODUCCIÓN)
+FACTURAMA_USER=tu_usuario_produccion
+FACTURAMA_PASSWORD=tu_password_produccion
+FACTURAMA_API_URL=https://api.facturama.mx/
+
+# Flask
+FLASK_APP=src.app
+FLASK_ENV=production
+SECRET_KEY=<genera-un-valor-aleatorio-de-al-menos-32-caracteres>
+```
+
+Para generar un `SECRET_KEY` seguro:
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+**Importante:** La URL cambia de `apisandbox.facturama.mx` a `api.facturama.mx`. Las credenciales de sandbox NO funcionan en producción (y viceversa). Si no tienes credenciales de producción, créalas desde el panel de Facturama.
+
+#### 2. Verificar la base de datos
+
+La BD de sandbox (`facturama_portal.db`) contiene datos de prueba. En producción tienes dos opciones:
+
+- **Opción A — Empezar limpio:** borrar `facturama_portal.db` y dejar que la app la cree vacía al iniciar
+- **Opción B — Migrar datos:** respaldar la BD anterior y usar los scripts en `scripts/` para poblar emisores y clientes reales
+
+#### 3. Ejecutar con Gunicorn (servidor WSGI)
+
+En producción NO uses `flask run`. Usa Gunicorn:
+
+```bash
+# Desde la raíz del proyecto, con el venv activado
+gunicorn src.app:app \
+    --bind 0.0.0.0:5000 \
+    --workers 4 \
+    --timeout 120 \
+    --access-logfile /var/log/facturama/access.log \
+    --error-logfile /var/log/facturama/error.log
+```
+
+Parámetros recomendados:
+- `--workers 4`: 4 procesos worker (ajusta según CPUs disponibles)
+- `--timeout 120`: timeout de 2 minutos (útil para generación de PDFs pesados)
+- `--access-logfile` y `--error-logfile`: logs separados para diagnóstico
+
+#### 4. Systemd (servicio permanente)
+
+Para que el portal se ejecute como servicio del sistema y se reinicie automáticamente:
+
+```ini
+# /etc/systemd/system/facturama-portal.service
+[Unit]
+Description=Facturama Portal
+After=network.target
+
+[Service]
+User=tu-usuario
+WorkingDirectory=/ruta/a/facturama-portal
+EnvironmentFile=/ruta/a/facturama-portal/.env
+ExecStart=/ruta/a/facturama-portal/.venv/bin/gunicorn src.app:app --bind 0.0.0.0:5000 --workers 4 --timeout 120
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Activar e iniciar:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable facturama-portal
+sudo systemctl start facturama-portal
+sudo systemctl status facturama-portal
+```
+
+#### 5. Firewall
+
+Si el portal va a ser accesible desde otras máquinas en la red:
+
+```bash
+# Permitir puerto 5000 solo en red local (ajusta la subred según tu caso)
+sudo ufw allow from 192.168.1.0/24 to any port 5000
+```
+
+#### 6. HTTPS (opcional pero recomendado)
+
+Para exponer el portal a internet, usa un reverse proxy con HTTPS:
+
+```bash
+# Nginx como reverse proxy
+sudo apt install nginx certbot python3-certbot-nginx
+```
+
+Configuración básica de Nginx (`/etc/nginx/sites-available/facturama`):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name facturama.tu-dominio.com;
+
+    ssl_certificate     /etc/letsencrypt/live/facturama.tu-dominio.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/facturama.tu-dominio.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+#### 7. Verificación final
+
+```bash
+# Tests
+pytest tests/ -v --tb=short
+
+# Health check HTTP
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/
+# Debe devolver 200
+
+# Verificar que carga el dashboard
+curl -s http://localhost:5000/ | grep -o '<title>.*</title>'
+# Debe mostrar: <title>Dashboard — Facturama Portal</title>
+```
+
+---
+
+### Para agentes AI
+
+Si eres un agente AI encargado de poner este proyecto en producción en una máquina nueva, sigue esta checklist en orden.
+
+#### Checklist de producción
+
+ ```
+[ ] 1. Leer README.md completo (sección Instalación primero)
+[ ] 2. Verificar Python:     python3 --version          # ≥ 3.10
+[ ] 3. Verificar sistema:    sudo apt install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev libcairo2
+[ ] 4. Crear venv:           python3 -m venv .venv && source .venv/bin/activate
+[ ] 5. Instalar:             pip install -e ".[dev]"
+[ ] 6. Verificar weasyprint: python3 -c "import weasyprint; print('OK')"
+[ ] 7. Verificar matplotlib: python3 -c "import matplotlib; print('OK')"
+[ ] 8. Crear .env producción con credenciales reales (NO sandbox)
+[ ] 9. Verificar .env:       cat .env | grep FACTURAMA_API_URL
+                              # Debe decir: https://api.facturama.mx/ (sin "sandbox")
+[ ]10. Generar SECRET_KEY:   python3 -c "import secrets; print(secrets.token_hex(32))"
+                              # Reemplazar el valor en .env
+[ ]11. FLASK_ENV=production en .env
+[ ]12. Borrar BD sandbox:    rm facturama_portal.db  (si empieza limpio)
+[ ]13. Ejecutar tests:       pytest tests/ -v --tb=short
+                              # Deben pasar los 45. Si fallan, corregir antes de continuar.
+[ ]14. Iniciar Gunicorn:     gunicorn src.app:app --bind 0.0.0.0:5000 --workers 4 --timeout 120 &
+[ ]15. Health check:         curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/
+                              # Debe ser 200
+[ ]16. Cargar dashboard:     curl -s http://localhost:5000/ | grep -q Dashboard && echo "OK"
+[ ]17. Verificar reportes:   curl -s "http://localhost:5000/reports/" | grep -q "Centro de reportes" && echo "OK"
+[ ]18. Instalar systemd:     sudo cp (crear archivo .service) → systemctl enable → start → status
+```
+
+#### Notas específicas para agentes
+
+- **No uses `flask run` en producción.** Usa `gunicorn` como se indica arriba.
+- **WeasyPrint requiere las dependencias del sistema** (paso 3). Si `import weasyprint` falla, instálalas primero.
+- **La BD se crea automáticamente** al iniciar la app. Si quieres empezar limpio, borra `facturama_portal.db` antes de arrancar.
+- **Si los tests fallan después de cambiar a producción**, probablemente es porque la BD de producción no tiene datos. Los tests usan una BD en memoria — no deberían fallar por esto.
+- **No expongas el puerto 5000 directamente a internet.** Usa Nginx como reverse proxy con HTTPS.
+- **Después de migrar, verifica manualmente** que puedas: (a) ver el dashboard, (b) crear un emisor, (c) timbrar una factura de prueba, (d) generar un reporte PDF.
+- **Si algo falla**, revisa los logs: `journalctl -u facturama-portal -f` (systemd) o los archivos de log configurados en Gunicorn.
+
+---
+
 ## Licencia
 
 Privado — uso interno.
