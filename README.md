@@ -397,6 +397,345 @@ Si eres un agente AI encargado de poner este proyecto en producción en una máq
 
 ---
 
+## Despliegue en VPS (Hetzner)
+
+Esta sección describe cómo poner el portal —y un agente Hermes como administrador— en un servidor virtual (VPS) para uso en producción real, accesible desde internet, disponible 24/7.
+
+### ¿Qué es un VPS?
+
+Un VPS (Virtual Private Server) es una computadora virtual que rentas en un datacenter. Para efectos prácticos es **idéntico a tener una laptop con Ubuntu prendida 24/7**, pero sin ocupar espacio, sin consumir tu electricidad y con internet ultrarrápido de datacenter. Eliges cuánta RAM, CPU y disco necesitas, y pagas una renta mensual fija.
+
+### ¿Por qué Hetzner?
+
+| Ventaja | Detalle |
+|---|---|
+| **Precio** | El más bajo del mercado: ~$6 USD/mes por 4 GB RAM |
+| **Rendimiento** | CPUs AMD EPYC, discos NVMe SSD |
+| **Datacenters** | Alemania, Finlandia, EE.UU., Singapur |
+| **Tráfico** | 20 TB incluidos (más que suficiente) |
+| **Simplicidad** | Panel web limpio, despliegue en 30 segundos |
+
+Hetzner es ideal para este proyecto: no necesitas balanceadores de carga, bases de datos administradas ni Kubernetes. Un solo VPS corre el portal + el agente sin problemas.
+
+### Arquitectura: portal + agente en el mismo VPS
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  VPS Hetzner CX22 (Ubuntu 24.04)                         │
+│  4 GB RAM · 2 vCPU · 40 GB NVMe · IP pública             │
+│                                                          │
+│  ┌──────────────────────┐  ┌───────────────────────────┐ │
+│  │  Portal Facturama     │  │  Agente Hermes            │ │
+│  │  Gunicorn :5000       │  │  Conectado a Telegram     │ │
+│  │  systemd (auto-start) │  │  Atiende a Iván 24/7      │ │
+│  └──────────────────────┘  └───────────────────────────┘ │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  Nginx :443 (HTTPS)                              │    │
+│  │  facturama.socium.mx → :5000                     │    │
+│  │  Certbot (Let's Encrypt, renovación automática)  │    │
+│  └──────────────────────────────────────────────────┘    │
+│                                                          │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  Base de datos SQLite (archivo .db local)         │    │
+│  └──────────────────────────────────────────────────┘    │
+└───────────────────────┬──────────────────────────────────┘
+                        │ internet
+          ┌─────────────┼─────────────┐
+          │             │             │
+     ┌────┴────┐  ┌────┴────┐  ┌─────┴──────┐
+     │  Iván   │  │ Clientes│  │ Agente AI  │
+     │(Telegram│  │(navega- │  │(administra │
+     │ y nave- │  │ dor web)│  │ el VPS)    │
+     │ gador)  │  │         │  │            │
+     └─────────┘  └─────────┘  └────────────┘
+```
+
+El portal y el agente **no se estorban** — son procesos independientes. El portal escucha en el puerto 5000 y el agente se comunica por Telegram. Es como tener WhatsApp y Chrome abiertos en la misma computadora.
+
+### Costos mensuales estimados
+
+| Concepto | Proveedor | Costo USD | Costo MXN |
+|---|---|---|---|
+| VPS CX22 (4 GB RAM, 40 GB disco) | Hetzner | $6.00 | ~$120 |
+| Dominio `.com` / `.mx` | Cloudflare / Namecheap | $1.00 | ~$20 |
+| API Facturama (producción) | Facturama | Lo que ya pagas | — |
+| **Total mensual** | | **~$7 USD** | **~$140 MXN** |
+
+Si quieres aún más económico, el plan CX11 (2 GB RAM, 20 GB disco) cuesta ~$3.50 USD/mes (~$70 MXN) y también funciona para volúmenes bajos/medios.
+
+### Paso a paso
+
+#### 1. Crear el VPS en Hetzner
+
+1. Ir a [hetzner.com/cloud](https://www.hetzner.com/cloud)
+2. Crear cuenta y agregar método de pago
+3. **Create Server:**
+   - **Location:** Nuremberg (mejor latencia desde México) o Ashburn (EE.UU.)
+   - **Image:** Ubuntu 24.04 LTS
+   - **Type:** CX22 (4 GB RAM, 2 vCPU, 40 GB NVMe)
+   - **SSH key:** Subir tu llave pública (`~/.ssh/id_rsa.pub`)
+   - **Name:** `facturama`
+4. Click **Create & Buy Now**
+
+En 30 segundos tienes una IP pública, ej. `168.119.45.XXX`.
+
+#### 2. Conectarse por SSH
+
+```bash
+ssh root@168.119.45.XXX
+```
+
+#### 3. Instalar dependencias del sistema
+
+```bash
+apt update && apt upgrade -y
+apt install -y python3 python3-pip python3-venv git curl nginx certbot python3-certbot-nginx
+apt install -y libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev libcairo2
+```
+
+#### 4. Crear usuario de servicio (buena práctica de seguridad)
+
+```bash
+adduser --disabled-password --gecos "" facturama
+usermod -aG sudo facturama
+su - facturama
+```
+
+#### 5. Clonar e instalar el portal
+
+```bash
+cd /opt
+sudo git clone https://github.com/IvanJS17/facturama-portal.git
+sudo chown -R facturama:facturama facturama-portal
+cd facturama-portal
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+#### 6. Crear `.env` de producción
+
+```bash
+nano .env
+```
+
+```env
+# Facturama API (PRODUCCIÓN — la URL NO lleva "sandbox")
+FACTURAMA_USER=tu_usuario_produccion
+FACTURAMA_PASSWORD=tu_password_produccion
+FACTURAMA_API_URL=https://api.facturama.mx/
+
+# Flask
+FLASK_APP=src.app
+FLASK_ENV=production
+SECRET_KEY=<pega-el-valor-generado-con-secrets.token_hex(32)>
+
+# Database
+DATABASE_URL=sqlite:///facturama_portal.db
+```
+
+Generar SECRET_KEY:
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Ajustar permisos del `.env`:
+
+```bash
+chmod 600 .env
+```
+
+#### 7. Verificar instalación
+
+```bash
+pytest tests/ -v --tb=short
+# Deben pasar 45 tests
+
+# Probar arranque rápido
+flask run --host=0.0.0.0 --port=5000 &
+sleep 2
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/
+# Debe devolver 200
+kill %1
+```
+
+#### 8. Configurar systemd para el portal
+
+```bash
+sudo nano /etc/systemd/system/facturama-portal.service
+```
+
+```ini
+[Unit]
+Description=Facturama Portal
+After=network.target
+
+[Service]
+User=facturama
+WorkingDirectory=/opt/facturama-portal
+EnvironmentFile=/opt/facturama-portal/.env
+ExecStart=/opt/facturama-portal/.venv/bin/gunicorn src.app:app --bind 127.0.0.1:5000 --workers 4 --timeout 120
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+> **Nota:** En VPS con Nginx como proxy, Gunicorn solo escucha en `127.0.0.1:5000` (localhost), NO en `0.0.0.0`. Nginx es el que recibe tráfico externo en el puerto 443 y lo reenvía.
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable facturama-portal
+sudo systemctl start facturama-portal
+sudo systemctl status facturama-portal
+```
+
+#### 9. Configurar dominio y HTTPS
+
+Si tienes un dominio (ej. `facturama.socium.mx`), apunta un registro A a la IP del VPS. Luego:
+
+```bash
+sudo nano /etc/nginx/sites-available/facturama
+```
+
+```nginx
+server {
+    listen 80;
+    server_name facturama.socium.mx;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name facturama.socium.mx;
+
+    ssl_certificate     /etc/letsencrypt/live/facturama.socium.mx/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/facturama.socium.mx/privkey.pem;
+
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+Activar el sitio y obtener certificado SSL:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/facturama /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default  # Quitar el default
+sudo nginx -t  # Verificar sintaxis
+sudo systemctl reload nginx
+sudo certbot --nginx -d facturama.socium.mx
+```
+
+Certbot configura la renovación automática (cada 90 días). Verificar:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+#### 10. Firewall
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+sudo ufw status verbose
+```
+
+#### 11. Instalar el agente Hermes en el VPS
+
+```bash
+# Como usuario facturama (no root)
+curl -fsSL https://hermes.nousresearch.com/install.sh | bash
+hermes setup
+hermes config set provider <tu-provider>
+hermes config set model <tu-modelo>
+hermes connect telegram
+```
+
+El agente vive como proceso en background y recibe tus mensajes por Telegram. Desde ahí puede administrar el portal: monitorear, reiniciar, depurar, agregar features.
+
+#### 12. Verificación final
+
+```bash
+# Portal responde
+curl -s -o /dev/null -w "%{http_code}" https://facturama.socium.mx
+# 200
+
+# Dashboard carga
+curl -s https://facturama.socium.mx | grep -q Dashboard && echo "OK"
+
+# Reportes funcionan
+curl -s "https://facturama.socium.mx/reports/" | grep -q "Centro de reportes" && echo "OK"
+
+# Servicio systemd OK
+sudo systemctl status facturama-portal | grep -q "active (running)" && echo "OK"
+
+# Nginx OK
+sudo nginx -t && echo "OK"
+
+# SSL activo
+curl -sI https://facturama.socium.mx | grep -q "HTTP/2 200" && echo "OK"
+```
+
+---
+
+### Checklist de despliegue para agentes AI
+
+Si eres un agente AI encargado de desplegar este proyecto en un VPS Hetzner nuevo:
+
+```
+[ ] 1. Verificar acceso SSH al VPS:      ssh root@<IP>
+[ ] 2. apt update && apt upgrade -y
+[ ] 3. Instalar paquetes:                apt install python3 python3-pip python3-venv git curl nginx certbot python3-certbot-nginx -y
+[ ] 4. Dependencias WeasyPrint:          apt install libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev libcairo2 -y
+[ ] 5. Crear usuario facturama:          adduser facturama && usermod -aG sudo facturama
+[ ] 6. Clonar repo en /opt:              git clone https://github.com/IvanJS17/facturama-portal.git /opt/facturama-portal
+[ ] 7. chown -R facturama:facturama /opt/facturama-portal
+[ ] 8. Crear venv:                       python3 -m venv .venv && source .venv/bin/activate
+[ ] 9. Instalar:                         pip install -e ".[dev]"
+[ ]10. Crear .env con credenciales de PRODUCCIÓN (NO sandbox)
+[ ]11. chmod 600 .env
+[ ]12. pytest tests/ -v --tb=short       # 45 tests deben pasar
+[ ]13. Crear /etc/systemd/system/facturama-portal.service
+[ ]14. systemctl enable facturama-portal && systemctl start facturama-portal
+[ ]15. curl localhost:5000 → 200
+[ ]16. Configurar Nginx + Certbot para HTTPS
+[ ]17. Configurar ufw: solo 22, 80, 443
+[ ]18. Instalar Hermes: bash <(curl -fsSL https://hermes.nousresearch.com/install.sh)
+[ ]19. hermes setup && hermes connect telegram
+[ ]20. Verificar dominio con HTTPS:      curl https://<dominio> → 200
+[ ]21. Probar flujo completo: navegar dashboard, crear emisor, timbrar factura, generar PDF
+```
+
+### Seguridad en el VPS
+
+| Medida | Comando / Acción |
+|---|---|
+| SSH solo con llave (sin contraseña) | `sudo nano /etc/ssh/sshd_config` → `PasswordAuthentication no` |
+| `.env` con permisos restrictivos | `chmod 600 /opt/facturama-portal/.env` |
+| Firewall mínimo | Solo puertos 22, 80, 443 abiertos |
+| HTTPS obligatorio | Nginx redirige HTTP → HTTPS |
+| Actualizaciones automáticas de seguridad | `sudo apt install unattended-upgrades && sudo dpkg-reconfigure unattended-upgrades` |
+| No ejecutar como root | El servicio corre como usuario `facturama` |
+| Backups de la BD | Cron job: `cp facturama_portal.db backups/$(date +%Y%m%d).db` |
+
+---
+
 ## Licencia
 
 Privado — uso interno.
