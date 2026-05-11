@@ -43,11 +43,11 @@
     </div>
 </div>
 
-<div class="content-grid">
-    <div class="card col-span-6">
+<div class="content-grid dashboard-content-grid">
+    <div class="card col-span-12">
         <h2>Emisores</h2>
         {% if issuers %}
-        <div class="table-wrap">
+        <div class="table-wrap dashboard-table-wrap">
             <table>
                 <thead><tr><th>RFC</th><th>Nombre</th><th>Régimen</th><th></th></tr></thead>
                 <tbody>
@@ -62,7 +62,7 @@
                 </tbody>
             </table>
         </div>
-        {% if issuers|length > 5 %}<p class="muted-note" style="margin-top:0.5rem;">Y {{ issuers|length - 5 }} más...</p>{% endif %}
+        {% if issuers|length > 5 %}<p class="muted-note dashboard-more-note">Y {{ issuers|length - 5 }} más...</p>{% endif %}
         {% else %}
         <div class="empty-state">
             <p>No hay emisores registrados.</p>
@@ -72,10 +72,10 @@
         <div class="form-actions"><a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-sm btn-primary">Agregar emisor</a></div>
     </div>
 
-    <div class="card col-span-6">
+    <div class="card col-span-12">
         <h2>Últimos CFDIs</h2>
         {% if cfdis %}
-        <div class="table-wrap dashboard-cfdi-table-scroll">
+        <div class="table-wrap dashboard-table-wrap">
             <table class="dashboard-cfdi-table">
                 <thead><tr><th>Emisor</th><th>Cliente</th><th>RFC</th><th>Folio</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody>
@@ -99,7 +99,7 @@
                 </tbody>
             </table>
         </div>
-        {% if cfdis|length > 5 %}<p class="muted-note" style="margin-top:0.5rem;">Y {{ cfdis|length - 5 }} más...</p>{% endif %}
+        {% if cfdis|length > 5 %}<p class="muted-note dashboard-more-note">Y {{ cfdis|length - 5 }} más...</p>{% endif %}
         {% else %}
         <div class="empty-state">
             <p>No hay CFDIs todavía.</p>

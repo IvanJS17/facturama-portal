@@ -579,9 +579,27 @@ tbody a:hover {
     background: linear-gradient(130deg, #f8faff 0%, #eef7ff 45%, #effff9 100%);
 }
 
+.dashboard-content-grid .card {
+    grid-column: span 12;
+}
+
+.dashboard-table-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dashboard-more-note {
+    margin-top: 0.5rem;
+}
+
 .dashboard-cfdi-table th,
 .dashboard-cfdi-table td {
     white-space: nowrap;
+}
+
+.dashboard-cfdi-table {
+    min-width: 960px;
 }
 
 /* CFDI flow */
