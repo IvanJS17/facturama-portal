@@ -967,6 +967,96 @@ class PortalDatabase:
                 params,
             ).fetchall()
 
+    def get_cfdis_by_period(self, issuer_id: int, start_date: str, end_date: str) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT c.id, c.uuid, c.serie, c.folio, c.recipient_name,
+                       COALESCE(cl.legal_name, c.recipient_name) AS client_name,
+                       c.total, c.status, c.created_at, c.raw_payload
+                FROM cfdis c
+                LEFT JOIN issuers i ON i.id = c.issuer_id
+                LEFT JOIN clients cl ON cl.id = c.client_id
+                WHERE c.issuer_id = ?
+                  AND date(c.created_at) >= date(?)
+                  AND date(c.created_at) <= date(?)
+                ORDER BY c.created_at ASC, c.id ASC
+                """,
+                (issuer_id, start_date, end_date),
+            ).fetchall()
+
+    def get_monthly_summary(self, issuer_id: int, year: int) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    strftime('%m', c.created_at) AS month,
+                    COUNT(DISTINCT c.id) AS count,
+                    COALESCE(SUM(ci.subtotal), 0) AS subtotal,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN ci.total >= ci.subtotal THEN ci.total - ci.subtotal
+                            ELSE (ci.total / 1.16) * 0.16
+                        END
+                    ), 0) AS iva,
+                    COALESCE(SUM(ci.total), 0) AS total
+                FROM cfdis c
+                LEFT JOIN issuers i ON i.id = c.issuer_id
+                LEFT JOIN cfdi_items ci ON ci.cfdi_id = c.id AND ci.issuer_id = c.issuer_id
+                WHERE c.issuer_id = ?
+                  AND strftime('%Y', c.created_at) = ?
+                GROUP BY strftime('%m', c.created_at)
+                ORDER BY month ASC
+                """,
+                (issuer_id, str(year)),
+            ).fetchall()
+
+    def get_product_breakdown(self, issuer_id: int, start_date: str, end_date: str) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    COALESCE(p.name, ci.name, ci.description, 'Sin producto') AS product_name,
+                    COUNT(DISTINCT ci.cfdi_id) AS count,
+                    COALESCE(SUM(ci.quantity), 0) AS quantity,
+                    COALESCE(SUM(ci.subtotal), 0) AS subtotal,
+                    COALESCE(SUM(ci.total), 0) AS total
+                FROM cfdi_items ci
+                LEFT JOIN cfdis c ON c.id = ci.cfdi_id
+                LEFT JOIN issuers i ON i.id = c.issuer_id
+                LEFT JOIN products p ON p.id = ci.product_id
+                WHERE c.issuer_id = ?
+                  AND ci.issuer_id = ?
+                  AND date(c.created_at) >= date(?)
+                  AND date(c.created_at) <= date(?)
+                GROUP BY COALESCE(p.name, ci.name, ci.description, 'Sin producto')
+                ORDER BY total DESC, product_name ASC
+                """,
+                (issuer_id, issuer_id, start_date, end_date),
+            ).fetchall()
+
+    def get_client_breakdown(self, issuer_id: int, start_date: str, end_date: str) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    COALESCE(cl.legal_name, c.recipient_name, 'Sin cliente') AS client_name,
+                    COUNT(DISTINCT c.id) AS count,
+                    COALESCE(SUM(ci.subtotal), 0) AS subtotal,
+                    COALESCE(SUM(ci.total), 0) AS total
+                FROM cfdis c
+                LEFT JOIN issuers i ON i.id = c.issuer_id
+                LEFT JOIN clients cl ON cl.id = c.client_id
+                LEFT JOIN cfdi_items ci ON ci.cfdi_id = c.id AND ci.issuer_id = c.issuer_id
+                WHERE c.issuer_id = ?
+                  AND date(c.created_at) >= date(?)
+                  AND date(c.created_at) <= date(?)
+                GROUP BY COALESCE(cl.legal_name, c.recipient_name, 'Sin cliente')
+                ORDER BY total DESC, client_name ASC
+                """,
+                (issuer_id, start_date, end_date),
+            ).fetchall()
+
     def mark_cfdi_cancelled(self, cfdi_id: str, raw_response: dict[str, Any] | None = None) -> None:
         with self.connect() as conn:
             conn.execute(

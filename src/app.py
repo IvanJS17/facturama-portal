@@ -24,7 +24,7 @@ def create_app() -> Flask:
     database.init_schema()
     app.extensions["portal_db"] = database
 
-    from src.routes import cfdi, clients, dashboard, issuers, products
+    from src.routes import cfdi, clients, dashboard, issuers, products, reports
 
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(cfdi.bp)
@@ -35,6 +35,8 @@ def create_app() -> Flask:
     app.register_blueprint(issuers.api_bp)
     app.register_blueprint(products.bp)
     app.register_blueprint(products.api_bp)
+    app.register_blueprint(reports.bp)
+    app.register_blueprint(reports.api_bp)
 
     @app.route("/health")
     def health():

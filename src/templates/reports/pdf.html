@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Reporte {{ report.report_type }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #111; }
+        h1, h2 { margin: 0 0 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        .small { font-size: 10px; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Reporte {{ report.report_type }}</h1>
+    <p>{{ report.issuer.legal_name }} ({{ report.issuer.rfc }})</p>
+    <p class="small">Periodo: {{ report.summary.start_date if report.summary.start_date is defined else '-' }} a {{ report.summary.end_date if report.summary.end_date is defined else '-' }}</p>
+
+    <h2>Resumen</h2>
+    <table>
+        <tr><th>Total CFDIs</th><td>{{ report.summary.total_cfdis if report.summary.total_cfdis is defined else '-' }}</td></tr>
+        <tr><th>Subtotal</th><td>{{ report.summary.subtotal if report.summary.subtotal is defined else '-' }}</td></tr>
+        <tr><th>IVA</th><td>{{ report.summary.iva if report.summary.iva is defined else '-' }}</td></tr>
+        <tr><th>Total</th><td>{{ report.summary.total if report.summary.total is defined else '-' }}</td></tr>
+    </table>
+
+    <h2>CFDIs</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th><th>UUID</th><th>Serie</th><th>Folio</th><th>Cliente</th><th>Total</th><th>Estatus</th><th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in report.cfdis %}
+            <tr>
+                <td>{{ row.id }}</td><td>{{ row.uuid }}</td><td>{{ row.serie }}</td><td>{{ row.folio }}</td>
+                <td>{{ row.client_name or row.recipient_name }}</td><td>{{ row.total }}</td><td>{{ row.status }}</td><td>{{ row.created_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

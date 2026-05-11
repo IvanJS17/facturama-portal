@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Reportes{% endblock %}
+{% block content %}
+<h1>Reportes</h1>
+<form method="get" action="{{ url_for('reports_api.report_preview') }}" class="card">
+    <label>Emisor</label>
+    <select name="issuer_id" required>
+        {% for issuer in issuers %}
+        <option value="{{ issuer.id }}">{{ issuer.legal_name }} ({{ issuer.rfc }})</option>
+        {% endfor %}
+    </select>
+
+    <label>Tipo</label>
+    <select name="type" required>
+        <option value="monthly">Mensual</option>
+        <option value="weekly">Semanal</option>
+        <option value="yearly">Anual</option>
+        <option value="custom">Personalizado</option>
+        <option value="product">Por producto</option>
+        <option value="client">Por cliente</option>
+        <option value="comparative">Comparativo</option>
+    </select>
+
+    <label>Año</label>
+    <input type="number" name="year" value="2026">
+    <label>Mes</label>
+    <input type="number" name="month" value="1" min="1" max="12">
+    <label>Semana ISO</label>
+    <input type="number" name="week" value="1" min="1" max="53">
+    <label>Mes A (comparativo)</label>
+    <input type="number" name="month_a" value="1" min="1" max="12">
+    <label>Mes B (comparativo)</label>
+    <input type="number" name="month_b" value="2" min="1" max="12">
+    <label>Producto ID</label>
+    <input type="number" name="product_id">
+    <label>Cliente ID</label>
+    <input type="number" name="client_id">
+    <label>Inicio</label>
+    <input type="date" name="start">
+    <label>Fin</label>
+    <input type="date" name="end">
+
+    <button type="submit" class="btn btn-primary">Ver reporte</button>
+</form>
+{% endblock %}
