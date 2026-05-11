@@ -101,7 +101,51 @@ def report_preview():
         if wants_json():
             return jsonify({"error": str(exc)}), 400
         abort(400, description=str(exc))
-    return render_template("reports/preview.html", report=payload)
+
+    # Build period label
+    period_label = ""
+    if report_type == "monthly":
+        from datetime import datetime as dt
+        period_label = f"{dt(int(params['year']), int(params['month']), 1):%B %Y}"
+    elif report_type == "yearly":
+        period_label = str(params["year"])
+    elif report_type == "weekly":
+        period_label = f"Semana {params['week']}, {params['year']}"
+    elif report_type in ("custom", "product", "client"):
+        period_label = f"{params.get('start', '...')} – {params.get('end', '...')}"
+
+    report_title = f"Reporte {report_type.capitalize()}"
+    type_names = {
+        "monthly": "Mensual", "weekly": "Semanal", "yearly": "Anual",
+        "custom": "Personalizado", "product": "por Producto", "client": "por Cliente",
+        "comparative": "Comparativo",
+    }
+    if report_type in type_names:
+        report_title = f"Reporte {type_names[report_type]}"
+
+    # Chart data
+    product_labels = [row["product_name"] for row in payload.get("by_product", [])]
+    product_values = [float(row.get("total", 0)) for row in payload.get("by_product", [])]
+    trend_labels = [row["month"] for row in payload.get("monthly_trend", [])]
+    trend_values = [float(row.get("total", 0)) for row in payload.get("monthly_trend", [])]
+
+    query_params = dict(request.args)
+
+    return render_template(
+        "reports/preview.html",
+        report_title=report_title,
+        period_label=period_label,
+        issuer=payload["issuer"],
+        summary=payload["summary"],
+        cfdis=payload["cfdis"],
+        by_product=payload.get("by_product", []),
+        by_client=payload.get("by_client", []),
+        product_labels=product_labels,
+        product_values=product_values,
+        trend_labels=trend_labels,
+        trend_values=trend_values,
+        query_params=query_params,
+    )
 
 
 @bp.get("/pdf")
@@ -115,11 +159,61 @@ def report_pdf():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    html = render_template("reports/pdf_template.html", report=payload)
+    # Build period label and title (same logic as preview)
+    from datetime import datetime as dt
+
+    period_label = ""
+    if report_type == "monthly":
+        period_label = f"{dt(int(params['year']), int(params['month']), 1):%B %Y}"
+    elif report_type == "yearly":
+        period_label = str(params["year"])
+    elif report_type == "weekly":
+        period_label = f"Semana {params['week']}, {params['year']}"
+    elif report_type in ("custom", "product", "client"):
+        period_label = f"{params.get('start', '...')} – {params.get('end', '...')}"
+
+    type_names = {
+        "monthly": "Mensual", "weekly": "Semanal", "yearly": "Anual",
+        "custom": "Personalizado", "product": "por Producto", "client": "por Cliente",
+        "comparative": "Comparativo",
+    }
+    report_title = f"Reporte {type_names.get(report_type, report_type.capitalize())}"
+
+    # Generate chart images
+    chart_product = None
+    chart_trend = None
+    try:
+        from src.utils.report_graphs import generate_product_pie, generate_trend_bar
+        prod_labels = [row["product_name"] for row in payload.get("by_product", [])]
+        prod_values = [float(row.get("total", 0)) for row in payload.get("by_product", [])]
+        if prod_labels:
+            chart_product = generate_product_pie(prod_labels, prod_values)
+        trend_labels = [row["month"] for row in payload.get("monthly_trend", [])]
+        trend_values = [float(row.get("total", 0)) for row in payload.get("monthly_trend", [])]
+        if trend_labels:
+            chart_trend = generate_trend_bar(trend_labels, trend_values)
+    except Exception:
+        pass  # Charts are optional
+
+    generation_date = dt.utcnow().strftime("%d/%m/%Y %H:%M")
+
+    html = render_template(
+        "reports/pdf_template.html",
+        report_title=report_title,
+        period_label=period_label,
+        issuer=payload["issuer"],
+        summary=payload["summary"],
+        cfdis=payload["cfdis"],
+        by_product=payload.get("by_product", []),
+        by_client=payload.get("by_client", []),
+        chart_product=chart_product,
+        chart_trend=chart_trend,
+        generation_date=generation_date,
+    )
     pdf_bytes = HTML(string=html).write_pdf()
     return send_file(
         BytesIO(pdf_bytes),
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"report-{issuer_id}-{report_type}.pdf",
+        download_name=f"reporte-{issuer_id}-{report_type}.pdf",
     )

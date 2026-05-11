@@ -143,7 +143,7 @@
                 <td>{{ row.serie or '-' }}</td>
                 <td>{{ row.folio or '-' }}</td>
                 <td>{{ row.client_name or row.cliente or '-' }}</td>
-                <td>{{ row.date or row.fecha or '-' }}</td>
+                <td>{{ row.created_at[:10] if row.created_at else '-' }}</td>
                 <td>${{ "%.2f"|format(row.total or 0) }}</td>
                 <td>{{ row.status or row.estatus or '-' }}</td>
             </tr>
@@ -161,8 +161,8 @@
         <tbody>
             {% for row in by_product %}
             <tr>
-                <td>{{ row.producto or row.name or '-' }}</td>
-                <td>{{ row.cantidad or row.quantity or 0 }}</td>
+                <td>{{ row.product_name or '-' }}</td>
+                <td>{{ row.count or row.quantity or 0 }}</td>
                 <td>${{ "%.2f"|format(row.subtotal or 0) }}</td>
                 <td>${{ "%.2f"|format(row.total or 0) }}</td>
             </tr>
@@ -181,7 +181,7 @@
             {% for row in by_client %}
             <tr>
                 <td>{{ row.cliente or row.client_name or '-' }}</td>
-                <td>{{ row.cfdis or 0 }}</td>
+                <td>{{ row.count or 0 }}</td>
                 <td>${{ "%.2f"|format(row.subtotal or 0) }}</td>
                 <td>${{ "%.2f"|format(row.total or 0) }}</td>
             </tr>
