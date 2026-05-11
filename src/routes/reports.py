@@ -58,6 +58,13 @@ def _collect_params(report_type: str) -> dict[str, Any]:
         params["year"] = _required_int("year")
         params["month_a"] = _required_int("month_a")
         params["month_b"] = _required_int("month_b")
+    elif report_type == "emisor":
+        params["year"] = _required_int("year")
+        params["month"] = _required_int("month")
+        if request.args.get("period_type"):
+            params["period_type"] = request.args.get("period_type")
+        if request.args.get("quarter"):
+            params["quarter"] = request.args.get("quarter")
     else:
         raise ValueError("Unsupported report type")
     return params
@@ -113,12 +120,14 @@ def report_preview():
         period_label = f"Semana {params['week']}, {params['year']}"
     elif report_type in ("custom", "product", "client"):
         period_label = f"{params.get('start', '...')} – {params.get('end', '...')}"
+    elif report_type == "emisor":
+        period_label = payload.get("period_label", "")
 
     report_title = f"Reporte {report_type.capitalize()}"
     type_names = {
         "monthly": "Mensual", "weekly": "Semanal", "yearly": "Anual",
         "custom": "Personalizado", "product": "por Producto", "client": "por Cliente",
-        "comparative": "Comparativo",
+        "comparative": "Comparativo", "emisor": "Consolidado por Emisor",
     }
     if report_type in type_names:
         report_title = f"Reporte {type_names[report_type]}"
@@ -130,6 +139,27 @@ def report_preview():
     trend_values = [float(row.get("total", 0)) for row in payload.get("monthly_trend", [])]
 
     query_params = dict(request.args)
+
+    if report_type == "emisor":
+        return render_template(
+            "reports/emisor_preview.html",
+            report_title=report_title,
+            period_label=period_label,
+            issuer=payload["issuer"],
+            summary=payload["summary"],
+            cfdis=payload["cfdis"],
+            by_product=payload.get("by_product", []),
+            by_client=payload.get("by_client", []),
+            monthly_trend=payload.get("monthly_trend", []),
+            top_products=payload.get("top_products", []),
+            top_clients=payload.get("top_clients", []),
+            previous_summary=payload.get("previous_summary", {}),
+            product_labels=product_labels,
+            product_values=product_values,
+            trend_labels=trend_labels,
+            trend_values=trend_values,
+            query_params=query_params,
+        )
 
     return render_template(
         "reports/preview.html",
@@ -171,11 +201,13 @@ def report_pdf():
         period_label = f"Semana {params['week']}, {params['year']}"
     elif report_type in ("custom", "product", "client"):
         period_label = f"{params.get('start', '...')} – {params.get('end', '...')}"
+    elif report_type == "emisor":
+        period_label = payload.get("period_label", "")
 
     type_names = {
         "monthly": "Mensual", "weekly": "Semanal", "yearly": "Anual",
         "custom": "Personalizado", "product": "por Producto", "client": "por Cliente",
-        "comparative": "Comparativo",
+        "comparative": "Comparativo", "emisor": "Consolidado por Emisor",
     }
     report_title = f"Reporte {type_names.get(report_type, report_type.capitalize())}"
 
@@ -197,19 +229,38 @@ def report_pdf():
 
     generation_date = dt.utcnow().strftime("%d/%m/%Y %H:%M")
 
-    html = render_template(
-        "reports/pdf_template.html",
-        report_title=report_title,
-        period_label=period_label,
-        issuer=payload["issuer"],
-        summary=payload["summary"],
-        cfdis=payload["cfdis"],
-        by_product=payload.get("by_product", []),
-        by_client=payload.get("by_client", []),
-        chart_product=chart_product,
-        chart_trend=chart_trend,
-        generation_date=generation_date,
-    )
+    if report_type == "emisor":
+        html = render_template(
+            "reports/emisor_pdf_template.html",
+            report_title=report_title,
+            period_label=period_label,
+            issuer=payload["issuer"],
+            summary=payload["summary"],
+            cfdis=payload["cfdis"],
+            by_product=payload.get("by_product", []),
+            by_client=payload.get("by_client", []),
+            monthly_trend=payload.get("monthly_trend", []),
+            top_products=payload.get("top_products", []),
+            top_clients=payload.get("top_clients", []),
+            previous_summary=payload.get("previous_summary", {}),
+            chart_product=chart_product,
+            chart_trend=chart_trend,
+            generation_date=generation_date,
+        )
+    else:
+        html = render_template(
+            "reports/pdf_template.html",
+            report_title=report_title,
+            period_label=period_label,
+            issuer=payload["issuer"],
+            summary=payload["summary"],
+            cfdis=payload["cfdis"],
+            by_product=payload.get("by_product", []),
+            by_client=payload.get("by_client", []),
+            chart_product=chart_product,
+            chart_trend=chart_trend,
+            generation_date=generation_date,
+        )
     pdf_bytes = HTML(string=html).write_pdf()
     return send_file(
         BytesIO(pdf_bytes),

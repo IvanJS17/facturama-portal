@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Reporte Consolidado por Emisor — Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{{ report_title }}</h1>
+        <p class="page-subtitle">{{ issuer.legal_name }} ({{ issuer.rfc }}) · {{ period_label }}</p>
+    </div>
+    <div class="form-actions">
+        <a href="{{ url_for('reports.report_pdf', **query_params) }}" class="btn btn-primary">Exportar PDF</a>
+        <a href="{{ url_for('reports.report_selector') }}" class="btn btn-secondary">Nuevo reporte</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card primary">
+        <div class="stat-value">{{ summary.total_cfdis or 0 }}</div>
+        <div class="stat-label">Total CFDIs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">${{ "%.2f"|format(summary.subtotal or 0) }}</div>
+        <div class="stat-label">Subtotal</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">${{ "%.2f"|format(summary.iva or 0) }}</div>
+        <div class="stat-label">IVA</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">${{ "%.2f"|format(summary.total or 0) }}</div>
+        <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ summary.cancelled or 0 }}</div>
+        <div class="stat-label">Cancelados</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">${{ "%.2f"|format(summary.avg_per_cfdi or 0) }}</div>
+        <div class="stat-label">Promedio por CFDI</div>
+    </div>
+</div>
+
+{% if previous_summary and previous_summary.total_cfdis is defined %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h2>Comparativo con período anterior</h2>
+    <div class="stats-grid" style="margin-top: 1rem;">
+        {% set prev_total = previous_summary.total or 0 %}
+        {% set curr_total = summary.total or 0 %}
+        {% if prev_total > 0 %}
+            {% set var_pct = ((curr_total - prev_total) / prev_total * 100) | round(1) %}
+        {% else %}
+            {% set var_pct = 0 %}
+        {% endif %}
+        <div class="stat-card {{ 'positive' if var_pct >= 0 else 'negative' }}">
+            <div class="stat-value">{{ "%.1f"|format(var_pct) }}%</div>
+            <div class="stat-label">Variación Total</div>
+        </div>
+
+        {% set prev_cfdis = previous_summary.total_cfdis or 0 %}
+        {% set curr_cfdis = summary.total_cfdis or 0 %}
+        {% if prev_cfdis > 0 %}
+            {% set var_cfdis = ((curr_cfdis - prev_cfdis) / prev_cfdis * 100) | round(1) %}
+        {% else %}
+            {% set var_cfdis = 0 %}
+        {% endif %}
+        <div class="stat-card {{ 'positive' if var_cfdis >= 0 else 'negative' }}">
+            <div class="stat-value">{{ "%.1f"|format(var_cfdis) }}%</div>
+            <div class="stat-label">Variación CFDIs</div>
+        </div>
+
+        {% set prev_sub = previous_summary.subtotal or 0 %}
+        {% set curr_sub = summary.subtotal or 0 %}
+        {% if prev_sub > 0 %}
+            {% set var_sub = ((curr_sub - prev_sub) / prev_sub * 100) | round(1) %}
+        {% else %}
+            {% set var_sub = 0 %}
+        {% endif %}
+        <div class="stat-card {{ 'positive' if var_sub >= 0 else 'negative' }}">
+            <div class="stat-value">{{ "%.1f"|format(var_sub) }}%</div>
+            <div class="stat-label">Variación Subtotal</div>
+        </div>
+
+        {% set prev_iva = previous_summary.iva or 0 %}
+        {% set curr_iva = summary.iva or 0 %}
+        {% if prev_iva > 0 %}
+            {% set var_iva = ((curr_iva - prev_iva) / prev_iva * 100) | round(1) %}
+        {% else %}
+            {% set var_iva = 0 %}
+        {% endif %}
+        <div class="stat-card {{ 'positive' if var_iva >= 0 else 'negative' }}">
+            <div class="stat-value">{{ "%.1f"|format(var_iva) }}%</div>
+            <div class="stat-label">Variación IVA</div>
+        </div>
+    </div>
+    <p style="margin-top: 0.75rem; color: #6b7280; font-size: 0.85rem;">
+        Período anterior: ${{ "%.2f"|format(prev_total) }} ({{ prev_cfdis }} CFDIs) vs Actual: ${{ "%.2f"|format(curr_total) }} ({{ curr_cfdis }} CFDIs)
+    </p>
+</div>
+{% endif %}
+
+<div class="form-row" style="align-items:start;">
+    <div class="card">
+        <h2>Tendencia mensual</h2>
+        <canvas id="trendChart" height="250"></canvas>
+    </div>
+    <div class="card">
+        <h2>Distribución por producto</h2>
+        <canvas id="productChart" height="250"></canvas>
+    </div>
+</div>
+
+<div class="form-row" style="align-items:start;">
+    <div class="card">
+        <h2>Top 5 Productos</h2>
+        <table>
+            <thead>
+                <tr><th>#</th><th>Producto</th><th>CFDIs</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for row in top_products %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ row.product_name or '-' }}</td>
+                    <td>{{ row.count or 0 }}</td>
+                    <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Sin datos de productos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Top 5 Clientes</h2>
+        <table>
+            <thead>
+                <tr><th>#</th><th>Cliente</th><th>CFDIs</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for row in top_clients %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ row.cliente or row.client_name or '-' }}</td>
+                    <td>{{ row.count or 0 }}</td>
+                    <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Sin datos de clientes.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Desglose por cliente</h2>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>Cliente</th><th>CFDIs</th><th>Subtotal</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for row in by_client %}
+                <tr>
+                    <td>{{ row.cliente or row.client_name or '-' }}</td>
+                    <td>{{ row.count or 0 }}</td>
+                    <td>${{ "%.2f"|format(row.subtotal or 0) }}</td>
+                    <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Sin datos de clientes.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Desglose por producto</h2>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>Producto</th><th>Cantidad</th><th>Subtotal</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for row in by_product %}
+                <tr>
+                    <td>{{ row.product_name or '-' }}</td>
+                    <td>{{ row.count or row.quantity or 0 }}</td>
+                    <td>${{ "%.2f"|format(row.subtotal or 0) }}</td>
+                    <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Sin datos de productos.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Tendencia mensual detallada</h2>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>Mes</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for row in monthly_trend %}
+                <tr>
+                    <td>{{ row.month }}</td>
+                    <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="2">Sin datos de tendencia.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <h2>CFDIs del período</h2>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Serie</th>
+                    <th>Folio</th>
+                    <th>Cliente</th>
+                    <th>Fecha</th>
+                    <th>Total</th>
+                    <th>Estatus</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in cfdis %}
+                <tr>
+                    <td>{{ row.serie or '-' }}</td>
+                    <td>{{ row.folio or '-' }}</td>
+                    <td>{{ row.client_name or row.cliente or '-' }}</td>
+                    <td>{{ row.created_at[:10] if row.created_at else '-' }}</td>
+                    <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                    <td>{{ row.status or row.estatus or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">Sin CFDIs para el período seleccionado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function () {
+    const productLabels = {{ product_labels | tojson }};
+    const productValues = {{ product_values | tojson }};
+    const trendLabels = {{ trend_labels | tojson }};
+    const trendValues = {{ trend_values | tojson }};
+
+    const productColors = ['#1a1a2e', '#16213e', '#3f72af', '#4f6d7a', '#5d737e', '#7b8cde', '#9aa5b1', '#ccd5df'];
+
+    new Chart(document.getElementById('productChart'), {
+        type: 'pie',
+        data: {
+            labels: productLabels,
+            datasets: [{
+                data: productValues,
+                backgroundColor: productLabels.map((_, idx) => productColors[idx % productColors.length])
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+
+    new Chart(document.getElementById('trendChart'), {
+        type: 'bar',
+        data: {
+            labels: trendLabels,
+            datasets: [{
+                label: 'Total',
+                data: trendValues,
+                backgroundColor: '#1a1a2e'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

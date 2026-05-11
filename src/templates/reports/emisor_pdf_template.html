@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #222;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .header {
+            border-bottom: 2px solid #1f2937;
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #111827;
+        }
+        .meta {
+            margin-top: 6px;
+            color: #4b5563;
+        }
+        .summary {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin-bottom: 16px;
+        }
+        .summary td {
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 8px;
+            width: 16.6%;
+            text-align: center;
+        }
+        .summary .label {
+            color: #6b7280;
+            font-size: 10px;
+            display: block;
+        }
+        .summary .value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #111827;
+        }
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+            color: #1f2937;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+        th, td {
+            border: 1px solid #d1d5db;
+            padding: 6px;
+            text-align: left;
+        }
+        th {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        tbody tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        .charts {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin-top: 6px;
+        }
+        .charts td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            vertical-align: top;
+            width: 50%;
+        }
+        .chart-title {
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+        .chart-img {
+            width: 100%;
+            height: auto;
+        }
+        .comparative {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin-bottom: 16px;
+        }
+        .comparative td {
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 8px;
+            text-align: center;
+        }
+        .comparative .label {
+            color: #6b7280;
+            font-size: 10px;
+            display: block;
+        }
+        .comparative .value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .positive { color: #059669; }
+        .negative { color: #dc2626; }
+        .top-section {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            margin-bottom: 12px;
+        }
+        .top-section td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            vertical-align: top;
+            width: 50%;
+        }
+        .top-section h3 {
+            font-size: 12px;
+            margin: 0 0 6px;
+            color: #374151;
+        }
+        .top-section table {
+            margin-bottom: 0;
+        }
+        .footer {
+            margin-top: 12px;
+            text-align: right;
+            color: #6b7280;
+            font-size: 10px;
+        }
+        .disclaimer {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e5e7eb;
+            color: #9ca3af;
+            font-size: 9px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ report_title }}</h1>
+        <div class="meta">{{ issuer.legal_name }} ({{ issuer.rfc }})</div>
+        <div class="meta">Periodo: {{ period_label }}</div>
+    </div>
+
+    <table class="summary">
+        <tr>
+            <td><span class="label">Total CFDIs</span><span class="value">{{ summary.total_cfdis or 0 }}</span></td>
+            <td><span class="label">Subtotal</span><span class="value">${{ "%.2f"|format(summary.subtotal or 0) }}</span></td>
+            <td><span class="label">IVA</span><span class="value">${{ "%.2f"|format(summary.iva or 0) }}</span></td>
+            <td><span class="label">Total</span><span class="value">${{ "%.2f"|format(summary.total or 0) }}</span></td>
+            <td><span class="label">Cancelados</span><span class="value">{{ summary.cancelled or 0 }}</span></td>
+            <td><span class="label">Promedio/CFDI</span><span class="value">${{ "%.2f"|format(summary.avg_per_cfdi or 0) }}</span></td>
+        </tr>
+    </table>
+
+    {% if previous_summary and previous_summary.total_cfdis is defined %}
+    {% set prev_total = previous_summary.total or 0 %}
+    {% set curr_total = summary.total or 0 %}
+    {% if prev_total > 0 %}
+        {% set var_pct = ((curr_total - prev_total) / prev_total * 100) | round(1) %}
+    {% else %}
+        {% set var_pct = 0 %}
+    {% endif %}
+    {% set prev_cfdis = previous_summary.total_cfdis or 0 %}
+    {% set curr_cfdis = summary.total_cfdis or 0 %}
+    {% if prev_cfdis > 0 %}
+        {% set var_cfdis = ((curr_cfdis - prev_cfdis) / prev_cfdis * 100) | round(1) %}
+    {% else %}
+        {% set var_cfdis = 0 %}
+    {% endif %}
+    {% set prev_sub = previous_summary.subtotal or 0 %}
+    {% set curr_sub = summary.subtotal or 0 %}
+    {% if prev_sub > 0 %}
+        {% set var_sub = ((curr_sub - prev_sub) / prev_sub * 100) | round(1) %}
+    {% else %}
+        {% set var_sub = 0 %}
+    {% endif %}
+    {% set prev_iva = previous_summary.iva or 0 %}
+    {% set curr_iva = summary.iva or 0 %}
+    {% if prev_iva > 0 %}
+        {% set var_iva = ((curr_iva - prev_iva) / prev_iva * 100) | round(1) %}
+    {% else %}
+        {% set var_iva = 0 %}
+    {% endif %}
+    <h2>Comparativo con período anterior</h2>
+    <table class="comparative">
+        <tr>
+            <td><span class="label">Variación Total</span><span class="value {{ 'positive' if var_pct >= 0 else 'negative' }}">{{ "%.1f"|format(var_pct) }}%</span></td>
+            <td><span class="label">Variación CFDIs</span><span class="value {{ 'positive' if var_cfdis >= 0 else 'negative' }}">{{ "%.1f"|format(var_cfdis) }}%</span></td>
+            <td><span class="label">Variación Subtotal</span><span class="value {{ 'positive' if var_sub >= 0 else 'negative' }}">{{ "%.1f"|format(var_sub) }}%</span></td>
+            <td><span class="label">Variación IVA</span><span class="value {{ 'positive' if var_iva >= 0 else 'negative' }}">{{ "%.1f"|format(var_iva) }}%</span></td>
+        </tr>
+    </table>
+    <p style="color: #6b7280; font-size: 10px; margin-bottom: 12px;">
+        Período anterior: ${{ "%.2f"|format(prev_total) }} ({{ prev_cfdis }} CFDIs) vs Actual: ${{ "%.2f"|format(curr_total) }} ({{ curr_cfdis }} CFDIs)
+    </p>
+    {% endif %}
+
+    <table class="charts">
+        <tr>
+            <td>
+                <div class="chart-title">Tendencia mensual</div>
+                {% if chart_trend %}<img src="{{ chart_trend }}" alt="Tendencia" class="chart-img">{% endif %}
+            </td>
+            <td>
+                <div class="chart-title">Distribución por producto</div>
+                {% if chart_product %}<img src="{{ chart_product }}" alt="Distribución por producto" class="chart-img">{% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <table class="top-section">
+        <tr>
+            <td>
+                <h3>Top 5 Productos</h3>
+                <table>
+                    <thead><tr><th>#</th><th>Producto</th><th>CFDIs</th><th>Total</th></tr></thead>
+                    <tbody>
+                        {% for row in top_products %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ row.product_name or '-' }}</td>
+                            <td>{{ row.count or 0 }}</td>
+                            <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4">Sin datos</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </td>
+            <td>
+                <h3>Top 5 Clientes</h3>
+                <table>
+                    <thead><tr><th>#</th><th>Cliente</th><th>CFDIs</th><th>Total</th></tr></thead>
+                    <tbody>
+                        {% for row in top_clients %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ row.cliente or row.client_name or '-' }}</td>
+                            <td>{{ row.count or 0 }}</td>
+                            <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4">Sin datos</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <h2>Desglose por cliente</h2>
+    <table>
+        <thead><tr><th>Cliente</th><th>CFDIs</th><th>Subtotal</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for row in by_client %}
+            <tr>
+                <td>{{ row.cliente or row.client_name or '-' }}</td>
+                <td>{{ row.count or 0 }}</td>
+                <td>${{ "%.2f"|format(row.subtotal or 0) }}</td>
+                <td>${{ "%.2f"|format(row.total or 0) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">Sin datos de clientes.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Desglose por producto</h2>
+    <table>
+        <thead><tr><th>Producto</th><th>Cantidad</th><th>Subtotal</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for row in by_product %}
+            <tr>
+                <td>{{ row.product_name or '-' }}</td>
+                <td>{{ row.count or row.quantity or 0 }}</td>
+                <td>${{ "%.2f"|format(row.subtotal or 0) }}</td>
+                <td>${{ "%.2f"|format(row.total or 0) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">Sin datos de productos.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Tendencia mensual detallada</h2>
+    <table>
+        <thead><tr><th>Mes</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for row in monthly_trend %}
+            <tr>
+                <td>{{ row.month }}</td>
+                <td>${{ "%.2f"|format(row.total or 0) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2">Sin datos de tendencia.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>CFDIs del período</h2>
+    <table>
+        <thead><tr><th>Serie</th><th>Folio</th><th>Cliente</th><th>Fecha</th><th>Total</th><th>Estatus</th></tr></thead>
+        <tbody>
+            {% for row in cfdis %}
+            <tr>
+                <td>{{ row.serie or '-' }}</td>
+                <td>{{ row.folio or '-' }}</td>
+                <td>{{ row.client_name or row.cliente or '-' }}</td>
+                <td>{{ row.created_at[:10] if row.created_at else '-' }}</td>
+                <td>${{ "%.2f"|format(row.total or 0) }}</td>
+                <td>{{ row.status or row.estatus or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">Sin CFDIs para el período seleccionado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">Generado el {{ generation_date }}</div>
+    <div class="disclaimer">Este reporte es de carácter informativo y no constituye un documento fiscal oficial. Los datos presentados corresponden a la información registrada en el sistema al momento de la generación.</div>
+</body>
+</html>

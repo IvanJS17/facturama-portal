@@ -24,6 +24,8 @@ class ReportService:
         normalized_type = (report_type or "custom").strip().lower()
         if normalized_type == "comparative":
             return self._build_comparative_report(issuer, params)
+        if normalized_type == "emisor":
+            return self._build_emisor_report(issuer, params)
 
         start_date, end_date = self._resolve_period(normalized_type, params)
         cfdi_rows = self.database.get_cfdis_by_period(issuer_id, start_date, end_date)
@@ -291,3 +293,114 @@ class ReportService:
             return []
         target_name = row["legal_name"]
         return [cfdi for cfdi in cfdis if cfdi.get("client_name") == target_name]
+
+    def _build_emisor_report(self, issuer: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+        year = int(params["year"])
+        period_type = params.get("period_type", "monthly")
+        quarter = params.get("quarter")
+
+        if period_type == "yearly":
+            start = date(year, 1, 1)
+            end = date(year, 12, 31)
+        elif period_type == "quarterly" and quarter:
+            q = int(str(quarter)[-1])
+            month_start = (q - 1) * 3 + 1
+            month_end = min(q * 3, 12)
+            start = date(year, month_start, 1)
+            end = date(year, month_end, self._month_end(date(year, month_end, 1)).day)
+        else:
+            month = int(params.get("month", 1))
+            start = date(year, month, 1)
+            end = self._month_end(start)
+
+        start_str = start.isoformat()
+        end_str = end.isoformat()
+
+        cfdi_rows = self.database.get_cfdis_by_period(issuer["id"], start_str, end_str)
+        cfdis = [
+            {
+                "id": row["id"],
+                "uuid": row["uuid"],
+                "serie": row["serie"],
+                "folio": row["folio"],
+                "recipient_name": row["recipient_name"],
+                "client_name": row["client_name"],
+                "total": float(row["total"] or 0),
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "raw_payload": row["raw_payload"],
+            }
+            for row in cfdi_rows
+        ]
+
+        summary = self.calculate_summary(issuer["id"], cfdis)
+        summary["start_date"] = start_str
+        summary["end_date"] = end_str
+
+        by_product = [dict(row) for row in self.database.get_product_breakdown(issuer["id"], start_str, end_str)]
+        by_client = [dict(row) for row in self.database.get_client_breakdown(issuer["id"], start_str, end_str)]
+        monthly_trend = self._monthly_trend_for_period(issuer["id"], start_str, end_str)
+
+        prev_start, prev_end = self._previous_period(start, end)
+        prev_cfdis = [
+            {
+                "id": row["id"],
+                "uuid": row["uuid"],
+                "serie": row["serie"],
+                "folio": row["folio"],
+                "recipient_name": row["recipient_name"],
+                "client_name": row["client_name"],
+                "total": float(row["total"] or 0),
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "raw_payload": row["raw_payload"],
+            }
+            for row in self.database.get_cfdis_by_period(issuer["id"], prev_start, prev_end)
+        ]
+        previous_summary = self.calculate_summary(issuer["id"], prev_cfdis)
+
+        top_products = sorted(by_product, key=lambda x: float(x.get("total", 0)), reverse=True)[:5]
+        top_clients = sorted(by_client, key=lambda x: float(x.get("total", 0)), reverse=True)[:5]
+
+        total_cfdis = summary.get("total_cfdis", 0)
+        summary["avg_per_cfdi"] = round(summary["total"] / total_cfdis, 2) if total_cfdis > 0 else 0.0
+
+        clean_cfdis = [{k: v for k, v in row.items() if k != "raw_payload"} for row in cfdis]
+
+        period_label = self._emisor_period_label(year, params)
+
+        return {
+            "issuer": {
+                "id": issuer["id"],
+                "legal_name": issuer["legal_name"],
+                "rfc": issuer["rfc"],
+            },
+            "report_type": "emisor",
+            "params": params,
+            "summary": summary,
+            "cfdis": clean_cfdis,
+            "by_product": by_product,
+            "by_client": by_client,
+            "monthly_trend": monthly_trend,
+            "top_products": top_products,
+            "top_clients": top_clients,
+            "previous_summary": previous_summary,
+            "period_label": period_label,
+        }
+
+    def _previous_period(self, start: date, end: date) -> tuple[str, str]:
+        delta = end - start
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - delta
+        return prev_start.isoformat(), prev_end.isoformat()
+
+    def _emisor_period_label(self, year: int, params: dict[str, Any]) -> str:
+        period_type = params.get("period_type", "monthly")
+        if period_type == "yearly":
+            return str(year)
+        if period_type == "quarterly":
+            quarter = int(str(params.get("quarter", "Q1"))[-1])
+            return f"Q{quarter} {year}"
+        month = int(params.get("month", 1))
+        from datetime import datetime as dt
+        return f"{dt(year, month, 1):%B %Y}"
