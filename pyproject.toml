@@ -9,6 +9,8 @@ dependencies = [
     "gunicorn>=21.0.0",
     "requests>=2.31.0",
     "facturama>=2.0.0",
+    "weasyprint>=60.0",
+    "matplotlib>=3.8.0",
 ]
 
 [project.optional-dependencies]
