@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Any
+import datetime
 
 from flask import Blueprint, abort, jsonify, render_template, request, send_file
 from weasyprint import HTML
@@ -65,7 +65,15 @@ def _collect_params(report_type: str) -> dict[str, Any]:
 
 @bp.get("/")
 def report_selector():
-    return render_template("reports/index.html", issuers=db().list_issuers())
+    current_year = datetime.datetime.utcnow().year
+    year_options = list(range(current_year - 2, current_year + 1))
+    return render_template(
+        "reports/index.html",
+        issuers=db().list_issuers(),
+        products=db().list_products(),
+        clients=db().list_clients(),
+        year_options=year_options,
+    )
 
 
 @api_bp.get("/data")
@@ -81,7 +89,7 @@ def report_data():
     return jsonify(payload)
 
 
-@api_bp.get("/preview")
+@bp.get("/preview")
 def report_preview():
     try:
         issuer_id = _required_int("issuer_id")
@@ -96,7 +104,7 @@ def report_preview():
     return render_template("reports/preview.html", report=payload)
 
 
-@api_bp.get("/pdf")
+@bp.get("/pdf")
 def report_pdf():
     try:
         issuer_id = _required_int("issuer_id")
@@ -107,7 +115,7 @@ def report_pdf():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    html = render_template("reports/pdf.html", report=payload)
+    html = render_template("reports/pdf_template.html", report=payload)
     pdf_bytes = HTML(string=html).write_pdf()
     return send_file(
         BytesIO(pdf_bytes),

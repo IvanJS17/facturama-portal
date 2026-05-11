@@ -2,7 +2,7 @@
 {% block title %}Reportes{% endblock %}
 {% block content %}
 <h1>Reportes</h1>
-<form method="get" action="{{ url_for('reports_api.report_preview') }}" class="card">
+<form method="get" action="{{ url_for('reports.report_preview') }}" class="card">
     <label>Emisor</label>
     <select name="issuer_id" required>
         {% for issuer in issuers %}
