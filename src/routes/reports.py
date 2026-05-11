@@ -9,7 +9,7 @@ from flask import Blueprint, abort, jsonify, render_template, request, send_file
 from weasyprint import HTML
 
 from src.routes.common import db, row_or_404, wants_json
-from src.services.reports import ReportService
+from src.services.reports import ReportService, _month_name_es
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
 api_bp = Blueprint("reports_api", __name__, url_prefix="/api/reports")
@@ -60,9 +60,15 @@ def _collect_params(report_type: str) -> dict[str, Any]:
         params["month_b"] = _required_int("month_b")
     elif report_type == "emisor":
         params["year"] = _required_int("year")
-        params["month"] = _required_int("month")
-        if request.args.get("period_type"):
-            params["period_type"] = request.args.get("period_type")
+        period_type = request.args.get("period_type", "monthly")
+        params["period_type"] = period_type
+        if period_type == "monthly":
+            params["month"] = _required_int("month")
+        elif period_type == "quarterly":
+            if request.args.get("quarter"):
+                params["quarter"] = request.args.get("quarter")
+            else:
+                params["month"] = _required_int("month")
         if request.args.get("quarter"):
             params["quarter"] = request.args.get("quarter")
     else:
@@ -112,8 +118,7 @@ def report_preview():
     # Build period label
     period_label = ""
     if report_type == "monthly":
-        from datetime import datetime as dt
-        period_label = f"{dt(int(params['year']), int(params['month']), 1):%B %Y}"
+        period_label = f"{_month_name_es(int(params['month']))} {params['year']}"
     elif report_type == "yearly":
         period_label = str(params["year"])
     elif report_type == "weekly":
@@ -194,7 +199,7 @@ def report_pdf():
 
     period_label = ""
     if report_type == "monthly":
-        period_label = f"{dt(int(params['year']), int(params['month']), 1):%B %Y}"
+        period_label = f"{_month_name_es(int(params['month']))} {params['year']}"
     elif report_type == "yearly":
         period_label = str(params["year"])
     elif report_type == "weekly":

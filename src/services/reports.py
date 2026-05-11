@@ -402,5 +402,16 @@ class ReportService:
             quarter = int(str(params.get("quarter", "Q1"))[-1])
             return f"Q{quarter} {year}"
         month = int(params.get("month", 1))
-        from datetime import datetime as dt
-        return f"{dt(year, month, 1):%B %Y}"
+        return f"{_month_name_es(month)} {year}"
+
+
+_MONTH_NAMES_ES = [
+    "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+
+
+def _month_name_es(month: int) -> str:
+    if 1 <= month <= 12:
+        return _MONTH_NAMES_ES[month]
+    return str(month)
