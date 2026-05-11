@@ -1,45 +1,281 @@
 {% extends "base.html" %}
 {% block title %}Reportes{% endblock %}
 {% block content %}
-<h1>Reportes</h1>
-<form method="get" action="{{ url_for('reports.report_preview') }}" class="card">
-    <label>Emisor</label>
-    <select name="issuer_id" required>
-        {% for issuer in issuers %}
-        <option value="{{ issuer.id }}">{{ issuer.legal_name }} ({{ issuer.rfc }})</option>
+{% set current_year = year_options[-1] if year_options else 2026 %}
+{% set current_month = 5 %}
+{% set selected_type = request.args.get('type', 'monthly') %}
+<div class="reports-shell">
+    <section class="reports-hero" aria-labelledby="reports-title">
+        <p class="reports-kicker">Centro de reportes</p>
+        <h1 id="reports-title">Genera reportes fiscales en segundos</h1>
+        <p class="reports-description">Selecciona el tipo de reporte y captura solo los datos necesarios. El sistema mostrará una vista previa antes de exportar.</p>
+    </section>
+
+    <form method="get" action="{{ url_for('reports.report_preview') }}" class="reports-form" id="report-form">
+        <input type="hidden" name="type" id="report-type-input" value="{{ selected_type }}">
+
+        <section class="reports-card">
+            <h2>1. Emisor</h2>
+            <div class="form-group">
+                <label for="issuer_id">Empresa emisora</label>
+                <select name="issuer_id" id="issuer_id" required>
+                    {% for issuer in issuers %}
+                    <option value="{{ issuer.id }}" {{ 'selected' if request.args.get('issuer_id', type=int) == issuer.id else '' }}>{{ issuer.legal_name }} ({{ issuer.rfc }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </section>
+
+        <section class="reports-card">
+            <h2>2. Tipo de reporte</h2>
+            <div class="report-type-grid" role="radiogroup" aria-label="Tipo de reporte">
+                {% set report_types = [
+                    ('monthly', 'Mensual', 'Resumen de un mes específico'),
+                    ('weekly', 'Semanal', 'Análisis por semana ISO'),
+                    ('yearly', 'Anual', 'Concentrado del año completo'),
+                    ('custom', 'Personalizado', 'Rango de fechas libre'),
+                    ('product', 'Por producto', 'Filtra por producto facturado'),
+                    ('client', 'Por cliente', 'Filtra por cliente específico'),
+                    ('comparative', 'Comparativo', 'Compara dos meses del mismo año')
+                ] %}
+                {% for value, label, desc in report_types %}
+                <button
+                    type="button"
+                    class="report-type-card {{ 'is-active' if selected_type == value else '' }}"
+                    data-report-type="{{ value }}"
+                    role="radio"
+                    aria-checked="{{ 'true' if selected_type == value else 'false' }}"
+                >
+                    <span class="report-type-label">{{ label }}</span>
+                    <span class="report-type-desc">{{ desc }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="reports-card">
+            <h2>3. Parámetros</h2>
+            <div class="form-row">
+                <div class="form-group" data-field="year">
+                    <label for="year">Año</label>
+                    <select name="year" id="year">
+                        {% for year in year_options %}
+                        <option value="{{ year }}" {{ 'selected' if request.args.get('year', current_year|string) == year|string else '' }}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" data-field="month">
+                    <label for="month">Mes</label>
+                    <select name="month" id="month">
+                        {% for month_num in range(1, 13) %}
+                        <option value="{{ month_num }}" {{ 'selected' if request.args.get('month', current_month|string) == month_num|string else '' }}>{{ month_num }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" data-field="week">
+                    <label for="week">Semana ISO</label>
+                    <input type="number" id="week" name="week" min="1" max="53" value="{{ request.args.get('week', '1') }}">
+                </div>
+
+                <div class="form-group" data-field="month_a">
+                    <label for="month_a">Mes A</label>
+                    <select id="month_a" name="month_a">
+                        {% for month_num in range(1, 13) %}
+                        <option value="{{ month_num }}" {{ 'selected' if request.args.get('month_a', current_month|string) == month_num|string else '' }}>{{ month_num }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" data-field="month_b">
+                    <label for="month_b">Mes B</label>
+                    <select id="month_b" name="month_b">
+                        {% for month_num in range(1, 13) %}
+                        <option value="{{ month_num }}" {{ 'selected' if request.args.get('month_b', ((current_month % 12) + 1)|string) == month_num|string else '' }}>{{ month_num }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" data-field="product_id">
+                    <label for="product_id">Producto</label>
+                    <select id="product_id" name="product_id">
+                        <option value="">Selecciona un producto</option>
+                    </select>
+                </div>
+
+                <div class="form-group" data-field="client_id">
+                    <label for="client_id">Cliente</label>
+                    <select id="client_id" name="client_id">
+                        <option value="">Selecciona un cliente</option>
+                    </select>
+                </div>
+            </div>
+
+            <fieldset class="date-range-group" data-field="date_range">
+                <legend>Rango de fechas</legend>
+                <div class="form-row">
+                    <div class="form-group" data-field="start">
+                        <label for="start">Fecha de inicio</label>
+                        <input type="date" id="start" name="start" value="{{ request.args.get('start', '') }}">
+                    </div>
+                    <div class="form-group" data-field="end">
+                        <label for="end">Fecha de fin</label>
+                        <input type="date" id="end" name="end" value="{{ request.args.get('end', '') }}">
+                    </div>
+                </div>
+            </fieldset>
+        </section>
+
+        <section class="reports-card report-summary" aria-live="polite">
+            <h2>Resumen de solicitud</h2>
+            <p id="report-summary-text">Completa los datos para generar la vista previa.</p>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Ver vista previa</button>
+            </div>
+        </section>
+    </form>
+</div>
+
+<script>
+(() => {
+    const products = [
+        {% for product in products %}
+        { id: {{ product.id }}, issuer_id: {{ product.issuer_id or 'null' }}, name: {{ (product.name or '') | tojson }} }{{ "," if not loop.last else "" }}
         {% endfor %}
-    </select>
+    ];
+    const clients = [
+        {% for client in clients %}
+        { id: {{ client.id }}, issuer_id: {{ client.issuer_id or 'null' }}, legal_name: {{ (client.legal_name or '') | tojson }} }{{ "," if not loop.last else "" }}
+        {% endfor %}
+    ];
 
-    <label>Tipo</label>
-    <select name="type" required>
-        <option value="monthly">Mensual</option>
-        <option value="weekly">Semanal</option>
-        <option value="yearly">Anual</option>
-        <option value="custom">Personalizado</option>
-        <option value="product">Por producto</option>
-        <option value="client">Por cliente</option>
-        <option value="comparative">Comparativo</option>
-    </select>
+    const typeInput = document.getElementById('report-type-input');
+    const typeCards = Array.from(document.querySelectorAll('.report-type-card'));
+    const issuerSelect = document.getElementById('issuer_id');
+    const productSelect = document.getElementById('product_id');
+    const clientSelect = document.getElementById('client_id');
+    const summaryText = document.getElementById('report-summary-text');
 
-    <label>Año</label>
-    <input type="number" name="year" value="2026">
-    <label>Mes</label>
-    <input type="number" name="month" value="1" min="1" max="12">
-    <label>Semana ISO</label>
-    <input type="number" name="week" value="1" min="1" max="53">
-    <label>Mes A (comparativo)</label>
-    <input type="number" name="month_a" value="1" min="1" max="12">
-    <label>Mes B (comparativo)</label>
-    <input type="number" name="month_b" value="2" min="1" max="12">
-    <label>Producto ID</label>
-    <input type="number" name="product_id">
-    <label>Cliente ID</label>
-    <input type="number" name="client_id">
-    <label>Inicio</label>
-    <input type="date" name="start">
-    <label>Fin</label>
-    <input type="date" name="end">
+    const fieldMap = {
+        monthly: ['year', 'month'],
+        weekly: ['year', 'week'],
+        yearly: ['year'],
+        custom: ['date_range', 'start', 'end'],
+        product: ['product_id', 'date_range', 'start', 'end'],
+        client: ['client_id', 'date_range', 'start', 'end'],
+        comparative: ['year', 'month_a', 'month_b']
+    };
 
-    <button type="submit" class="btn btn-primary">Ver reporte</button>
-</form>
+    const typeNames = {
+        monthly: 'mensual',
+        weekly: 'semanal',
+        yearly: 'anual',
+        custom: 'personalizado',
+        product: 'por producto',
+        client: 'por cliente',
+        comparative: 'comparativo'
+    };
+
+    function selectedText(select) {
+        return select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
+    }
+
+    function populateSelect(selectEl, source, selectedValue, placeholder) {
+        const issuerId = issuerSelect.value;
+        const filtered = source.filter((item) => String(item.issuer_id || '') === String(issuerId));
+        const options = [`<option value="">${placeholder}</option>`].concat(
+            filtered.map((item) => `<option value="${item.id}">${(item.name || item.legal_name || 'Sin nombre')}</option>`)
+        );
+        selectEl.innerHTML = options.join('');
+        if (selectedValue && filtered.some((item) => String(item.id) === String(selectedValue))) {
+            selectEl.value = String(selectedValue);
+        } else {
+            selectEl.value = '';
+        }
+    }
+
+    function toggleFieldGroup(activeType) {
+        const visibleFields = new Set(fieldMap[activeType] || []);
+        document.querySelectorAll('[data-field]').forEach((group) => {
+            const key = group.dataset.field;
+            const visible = visibleFields.has(key);
+            group.classList.toggle('is-hidden', !visible);
+
+            const controls = group.querySelectorAll('input, select');
+            controls.forEach((control) => {
+                const shouldEnable = visible || (control.name === 'issuer_id') || (control.name === 'type');
+                control.disabled = !shouldEnable;
+                control.required = false;
+            });
+        });
+
+        if (activeType === 'custom') {
+            document.getElementById('start').required = true;
+            document.getElementById('end').required = true;
+        }
+        if (activeType === 'product') {
+            productSelect.required = true;
+        }
+        if (activeType === 'client') {
+            clientSelect.required = true;
+        }
+    }
+
+    function refreshSummary() {
+        const type = typeInput.value;
+        const issuer = selectedText(issuerSelect);
+        let details = '';
+
+        if (type === 'monthly') details = `Año ${document.getElementById('year').value}, mes ${document.getElementById('month').value}`;
+        if (type === 'weekly') details = `Año ${document.getElementById('year').value}, semana ${document.getElementById('week').value}`;
+        if (type === 'yearly') details = `Año ${document.getElementById('year').value}`;
+        if (type === 'custom') details = `${document.getElementById('start').value || 'sin inicio'} a ${document.getElementById('end').value || 'sin fin'}`;
+        if (type === 'product') details = `Producto: ${selectedText(productSelect) || 'sin seleccionar'} (${document.getElementById('start').value || 'sin inicio'} a ${document.getElementById('end').value || 'sin fin'})`;
+        if (type === 'client') details = `Cliente: ${selectedText(clientSelect) || 'sin seleccionar'} (${document.getElementById('start').value || 'sin inicio'} a ${document.getElementById('end').value || 'sin fin'})`;
+        if (type === 'comparative') details = `Año ${document.getElementById('year').value}, mes ${document.getElementById('month_a').value} vs ${document.getElementById('month_b').value}`;
+
+        summaryText.textContent = `Reporte ${typeNames[type] || type} para ${issuer || 'emisor sin seleccionar'}. ${details}.`;
+    }
+
+    function setType(nextType) {
+        typeInput.value = nextType;
+        typeCards.forEach((card) => {
+            const active = card.dataset.reportType === nextType;
+            card.classList.toggle('is-active', active);
+            card.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        toggleFieldGroup(nextType);
+        refreshSummary();
+    }
+
+    const selectedProduct = "{{ request.args.get('product_id', '') }}";
+    const selectedClient = "{{ request.args.get('client_id', '') }}";
+
+    issuerSelect.addEventListener('change', () => {
+        populateSelect(productSelect, products, selectedProduct, 'Selecciona un producto');
+        populateSelect(clientSelect, clients, selectedClient, 'Selecciona un cliente');
+        refreshSummary();
+    });
+
+    typeCards.forEach((card) => {
+        card.addEventListener('click', () => setType(card.dataset.reportType));
+        card.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setType(card.dataset.reportType);
+            }
+        });
+    });
+
+    document.querySelectorAll('#report-form input, #report-form select').forEach((el) => {
+        el.addEventListener('change', refreshSummary);
+        el.addEventListener('input', refreshSummary);
+    });
+
+    populateSelect(productSelect, products, selectedProduct, 'Selecciona un producto');
+    populateSelect(clientSelect, clients, selectedClient, 'Selecciona un cliente');
+    setType(typeInput.value || 'monthly');
+})();
+</script>
 {% endblock %}
