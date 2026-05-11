@@ -7,33 +7,70 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">🏢 Facturama Portal</div>
-        <div class="nav-links">
-            <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
-            <a href="{{ url_for('issuers.list_issuers') }}">Emisores</a>
-            <a href="{{ url_for('clients.list_clients') }}">Clientes</a>
-            <a href="{{ url_for('products.list_products') }}">Productos</a>
-            <a href="/reports">Reportes</a>
-            <a href="{{ url_for('cfdi.list_cfdis') }}">CFDIs</a>
-            <a href="{{ url_for('cfdi.new_cfdi') }}">+ Nueva Factura</a>
-        </div>
-    </nav>
+    <div class="app-shell">
+        <nav class="navbar">
+            <div class="navbar-inner">
+                <a class="nav-brand" href="{{ url_for('dashboard.index') }}">
+                    <span aria-hidden="true">🏢</span>
+                    <span>Facturama Portal</span>
+                </a>
+                <div class="nav-links" id="main-nav-links">
+                    <a href="{{ url_for('dashboard.index') }}" data-nav="dashboard">Dashboard</a>
+                    <a href="{{ url_for('issuers.list_issuers') }}" data-nav="issuers">Emisores</a>
+                    <a href="{{ url_for('clients.list_clients') }}" data-nav="clients">Clientes</a>
+                    <a href="{{ url_for('products.list_products') }}" data-nav="products">Productos</a>
+                    <a href="/reports" data-nav="reports">Reportes</a>
+                    <a href="{{ url_for('cfdi.list_cfdis') }}" data-nav="cfdi">CFDIs</a>
+                    <a href="{{ url_for('cfdi.new_cfdi') }}" class="nav-cta" data-nav="cfdi-new">Nueva Factura</a>
+                </div>
+            </div>
+        </nav>
 
-    <main class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
+        <main class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
 
-        {% block content %}{% endblock %}
-    </main>
+            {% block content %}{% endblock %}
+        </main>
 
-    <footer class="footer">
-        Facturama Portal — Sandbox Mode — API Multiemisor
-    </footer>
+        <footer class="footer">
+            Facturama Portal - Sandbox Mode - API Multiemisor
+        </footer>
+    </div>
+
+    <script>
+    (function() {
+        const path = window.location.pathname.replace(/\/+$/, '') || '/';
+        const navMap = [
+            { key: 'reports', test: p => p === '/reports' || p.startsWith('/reports/') },
+            { key: 'cfdi-new', test: p => p === '/cfdi/new' },
+            { key: 'cfdi', test: p => p === '/cfdi' || p.startsWith('/cfdi/') },
+            { key: 'issuers', test: p => p === '/issuers' || p.startsWith('/issuers/') },
+            { key: 'clients', test: p => p === '/clients' || p.startsWith('/clients/') },
+            { key: 'products', test: p => p === '/products' || p.startsWith('/products/') },
+            { key: 'dashboard', test: p => p === '' || p === '/' }
+        ];
+
+        let activeKey = 'dashboard';
+        for (const item of navMap) {
+            if (item.test(path)) {
+                activeKey = item.key;
+                break;
+            }
+        }
+
+        const links = document.querySelectorAll('#main-nav-links a[data-nav]');
+        links.forEach(link => {
+            if (link.dataset.nav === activeKey || (activeKey === 'cfdi-new' && link.dataset.nav === 'cfdi')) {
+                link.classList.add('active');
+            }
+        });
+    })();
+    </script>
 </body>
 </html>

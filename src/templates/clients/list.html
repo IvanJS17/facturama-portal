@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Clientes — Facturama Portal{% endblock %}
+{% block title %}Clientes - Facturama Portal{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -8,68 +8,74 @@
         <h1>Clientes</h1>
         {% if filter_issuer_id %}
         {% for issuer in issuers %}{% if issuer.id == filter_issuer_id %}
-        <p class="page-subtitle">Mostrando clientes de {{ issuer.legal_name }} — {{ issuer.rfc }}</p>
+        <p class="page-subtitle">Mostrando clientes de {{ issuer.legal_name }} - {{ issuer.rfc }}</p>
         {% endif %}{% endfor %}
+        {% else %}
+        <p class="page-subtitle">Administra tus receptores para facturar más rápido.</p>
         {% endif %}
     </div>
-    <a href="{{ url_for('clients.new_client', issuer_id=filter_issuer_id) if filter_issuer_id else url_for('clients.new_client') }}" class="btn btn-primary">+ Agregar cliente</a>
+    <a href="{{ url_for('clients.new_client', issuer_id=filter_issuer_id) if filter_issuer_id else url_for('clients.new_client') }}" class="btn btn-primary">Agregar cliente</a>
 </div>
 
 <div class="card">
-    <form method="get" class="filter-bar" style="margin-bottom:1rem;">
-        <label style="font-weight:600;">Filtrar por emisor:</label>
-        <select name="issuer_id" onchange="this.form.submit()">
-            <option value="">— Todos los emisores —</option>
-            {% for issuer in issuers %}
-            <option value="{{ issuer.id }}" {{ 'selected' if filter_issuer_id == issuer.id else '' }}>{{ issuer.rfc }} — {{ issuer.legal_name }}</option>
-            {% endfor %}
-        </select>
+    <form method="get" class="filter-bar">
+        <div class="filter-field">
+            <label class="filter-label" for="issuer_id">Filtrar por emisor</label>
+            <select id="issuer_id" name="issuer_id" onchange="this.form.submit()">
+                <option value="">Todos los emisores</option>
+                {% for issuer in issuers %}
+                <option value="{{ issuer.id }}" {{ 'selected' if filter_issuer_id == issuer.id else '' }}>{{ issuer.rfc }} - {{ issuer.legal_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         {% if filter_issuer_id %}
         <a href="{{ url_for('clients.list_clients') }}" class="btn btn-secondary">Limpiar filtro</a>
         {% endif %}
     </form>
 
     {% if clients %}
-    <table>
-        <thead>
-            <tr>
-                <th>Emisor</th>
-                <th>RFC</th>
-                <th>Nombre / Razón social</th>
-                <th>Uso CFDI</th>
-                <th>Régimen</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for client in clients %}
-            <tr>
-                <td>
-                    {% if client.issuer_name %}
-                    <span style="font-weight:bold;color:#1a1a2e;">{{ client.issuer_name }}</span>
-                    {% if client.issuer_rfc %}<br><small style="color:#666;">{{ client.issuer_rfc }}</small>{% endif %}
-                    {% else %}
-                    <span class="badge badge-canceled">Emisor faltante — corregir</span>
-                    {% endif %}
-                </td>
-                <td><a href="{{ url_for('clients.edit_client', client_id=client.id) }}">{{ client.rfc }}</a></td>
-                <td>{{ client.legal_name }}</td>
-                <td>{{ client.cfdi_use }}</td>
-                <td>{{ client.tax_regime }}</td>
-                <td>
-                    <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-secondary">Editar</a>
-                    <form method="post" action="{{ url_for('clients.delete_client', client_id=client.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar cliente?');">
-                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                    </form>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Emisor</th>
+                    <th>RFC</th>
+                    <th>Nombre / Razón social</th>
+                    <th>Uso CFDI</th>
+                    <th>Régimen</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for client in clients %}
+                <tr>
+                    <td>
+                        {% if client.issuer_name %}
+                        <strong>{{ client.issuer_name }}</strong>
+                        {% if client.issuer_rfc %}<br><small class="muted-note">{{ client.issuer_rfc }}</small>{% endif %}
+                        {% else %}
+                        <span class="badge badge-canceled">Emisor faltante - corregir</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('clients.edit_client', client_id=client.id) }}">{{ client.rfc }}</a></td>
+                    <td>{{ client.legal_name }}</td>
+                    <td><span class="badge badge-soft">{{ client.cfdi_use }}</span></td>
+                    <td>{{ client.tax_regime }}</td>
+                    <td class="actions">
+                        <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-secondary">Editar</a>
+                        <form method="post" action="{{ url_for('clients.delete_client', client_id=client.id) }}" class="inline-form" onsubmit="return confirm('¿Eliminar cliente?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
     <div class="empty-state">
         <p>No hay clientes registrados{% if filter_issuer_id %} para este emisor{% endif %}.</p>
-        <a href="{{ url_for('clients.new_client', issuer_id=filter_issuer_id) if filter_issuer_id else url_for('clients.new_client') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar cliente</a>
+        <a href="{{ url_for('clients.new_client', issuer_id=filter_issuer_id) if filter_issuer_id else url_for('clients.new_client') }}" class="btn btn-primary">Agregar cliente</a>
     </div>
     {% endif %}
 </div>

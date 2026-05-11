@@ -1,65 +1,73 @@
 {% extends "base.html" %}
 
-{% block title %}CFDIs — Facturama Portal{% endblock %}
+{% block title %}CFDIs - Facturama Portal{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>CFDIs</h1>
-    <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">+ Nueva Factura</a>
+    <div>
+        <h1>CFDIs</h1>
+        <p class="page-subtitle">Consulta, filtra y entra al detalle de tus comprobantes fiscales.</p>
+    </div>
+    <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">Nueva Factura</a>
 </div>
 
 <div class="card">
-    {# Filters #}
     <form method="get" class="filter-bar">
-        <input type="search" name="recipient_rfc" value="{{ recipient_rfc }}" placeholder="Buscar por RFC receptor..." aria-label="RFC receptor">
-        <select name="status">
-            <option value="">Todos los estados</option>
-            <option value="active" {{ 'selected' if status == 'active' else '' }}>Activos</option>
-            <option value="canceled" {{ 'selected' if status == 'canceled' else '' }}>Cancelados</option>
-        </select>
+        <div class="filter-field">
+            <label class="filter-label" for="recipient_rfc">RFC receptor</label>
+            <input id="recipient_rfc" type="search" name="recipient_rfc" value="{{ recipient_rfc }}" placeholder="Buscar por RFC receptor..." aria-label="RFC receptor">
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="status">Estado</label>
+            <select id="status" name="status">
+                <option value="">Todos los estados</option>
+                <option value="active" {{ 'selected' if status == 'active' else '' }}>Activos</option>
+                <option value="canceled" {{ 'selected' if status == 'canceled' else '' }}>Cancelados</option>
+            </select>
+        </div>
         <button type="submit" class="btn btn-secondary">Filtrar</button>
         <a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-secondary">Limpiar</a>
     </form>
 
     {% if cfdis %}
-    <table>
-        <thead>
-            <tr>
-                <th>Emisor</th>
-                <th>Receptor / Cliente</th>
-                <th>RFC Receptor</th>
-                <th>Total</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for cfdi in cfdis %}
-            <tr>
-                <td>
-                    <span style="font-weight:bold;color:#1a1a2e;">{{ cfdi.issuer_name or '—' }}</span>
-                    {% if cfdi.issuer_rfc %}<br><small style="color:#666;">{{ cfdi.issuer_rfc }}</small>{% endif %}
-                </td>
-                <td>{{ cfdi.client_name or cfdi.recipient_name or '—' }}</td>
-                <td>{{ cfdi.recipient_rfc }}</td>
-                <td>${{ "%.2f"|format(cfdi.total) }}</td>
-                <td>{{ cfdi.cfdi_type }}</td>
-                <td><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}">{{ cfdi.status }}</span></td>
-                <td>
-                    <a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}" class="btn btn-sm btn-secondary">Ver</a>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Emisor</th>
+                    <th>Receptor / Cliente</th>
+                    <th>RFC Receptor</th>
+                    <th>Total</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for cfdi in cfdis %}
+                <tr>
+                    <td>
+                        <strong>{{ cfdi.issuer_name or '—' }}</strong>
+                        {% if cfdi.issuer_rfc %}<br><small class="muted-note">{{ cfdi.issuer_rfc }}</small>{% endif %}
+                    </td>
+                    <td>{{ cfdi.client_name or cfdi.recipient_name or '—' }}</td>
+                    <td>{{ cfdi.recipient_rfc }}</td>
+                    <td>${{ "%.2f"|format(cfdi.total) }}</td>
+                    <td><span class="badge badge-soft">{{ cfdi.cfdi_type }}</span></td>
+                    <td><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}">{{ cfdi.status }}</span></td>
+                    <td><a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}" class="btn btn-sm btn-secondary">Ver</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
     <div class="empty-state">
         {% if recipient_rfc or status %}
         <p>No hay CFDIs que coincidan con los filtros.</p>
         {% else %}
         <p>No hay CFDIs registrados.</p>
-        <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Crear primera factura</a>
+        <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">Crear primera factura</a>
         {% endif %}
     </div>
     {% endif %}

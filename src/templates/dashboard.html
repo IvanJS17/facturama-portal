@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — Facturama Portal{% endblock %}
+{% block title %}Dashboard - Facturama Portal{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -8,10 +8,14 @@
         <h1>Dashboard</h1>
         <p class="page-subtitle">{{ current_date }}</p>
     </div>
-    <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">+ Nueva Factura</a>
+    <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">Nueva Factura</a>
 </div>
 
-{# Stats #}
+<div class="card dashboard-hero card-muted">
+    <p class="step-chip">Resumen operativo</p>
+    <p class="page-subtitle">Accede rápido a tus emisores, clientes, catálogo y facturación reciente.</p>
+</div>
+
 <div class="stats-grid">
     <div class="stat-card primary">
         <div class="stat-value">{{ cfdis|length }}</div>
@@ -39,64 +43,70 @@
     </div>
 </div>
 
-<div class="form-row">
-    {# Emisores #}
-    <div class="card">
+<div class="content-grid">
+    <div class="card col-span-6">
         <h2>Emisores</h2>
         {% if issuers %}
-        <table>
-            <thead><tr><th>RFC</th><th>Nombre</th><th>Régimen</th><th></th></tr></thead>
-            <tbody>
-            {% for issuer in issuers[:5] %}
-                <tr>
-                    <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}">{{ issuer.rfc }}</a></td>
-                    <td>{{ issuer.legal_name }}</td>
-                    <td>{{ issuer.tax_regime }}</td>
-                    <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Editar</a></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% if issuers|length > 5 %}<p style="margin-top:0.5rem;font-size:0.85rem;color:#888;">Y {{ issuers|length - 5 }} más...</p>{% endif %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>RFC</th><th>Nombre</th><th>Régimen</th><th></th></tr></thead>
+                <tbody>
+                {% for issuer in issuers[:5] %}
+                    <tr>
+                        <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}">{{ issuer.rfc }}</a></td>
+                        <td>{{ issuer.legal_name }}</td>
+                        <td>{{ issuer.tax_regime }}</td>
+                        <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Editar</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if issuers|length > 5 %}<p class="muted-note" style="margin-top:0.5rem;">Y {{ issuers|length - 5 }} más...</p>{% endif %}
         {% else %}
-        <div class="empty-state"><p>No hay emisores. <a href="{{ url_for('issuers.new_issuer') }}">Agregar uno</a></p></div>
+        <div class="empty-state">
+            <p>No hay emisores registrados.</p>
+            <a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-primary">Agregar emisor</a>
+        </div>
         {% endif %}
-        <div style="margin-top:0.75rem;"><a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-sm btn-primary">+ Agregar emisor</a></div>
+        <div class="form-actions"><a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-sm btn-primary">Agregar emisor</a></div>
     </div>
 
-    {# Últimos CFDIs #}
-    <div class="card">
+    <div class="card col-span-6">
         <h2>Últimos CFDIs</h2>
         {% if cfdis %}
-        <div class="dashboard-cfdi-table-scroll">
-        <table class="dashboard-cfdi-table">
-            <thead><tr><th>Emisor</th><th>Cliente</th><th>RFC</th><th>Folio</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody>
-            {% for cfdi in cfdis[:5] %}
-                <tr>
-                    <td><strong>{{ cfdi.issuer_name or cfdi.issuer_rfc }}</strong></td>
-                    <td>{{ cfdi.client_name or cfdi.recipient_name }}</td>
-                    <td>{{ cfdi.recipient_rfc }}</td>
-                    <td>
-                        {% if cfdi.folio is not none %}
-                            {{ '...' ~ ('%04d'|format(cfdi.folio|int))[-4:] }}
-                        {% else %}
-                            {{ '...' ~ (cfdi.facturama_id|string)[-6:] }}
-                        {% endif %}
-                    </td>
-                    <td>${{ "%.2f"|format(cfdi.total) }}</td>
-                    <td><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}">{{ cfdi.status }}</span></td>
-                    <td><a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}" class="btn btn-sm btn-secondary">Ver</a></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-wrap dashboard-cfdi-table-scroll">
+            <table class="dashboard-cfdi-table">
+                <thead><tr><th>Emisor</th><th>Cliente</th><th>RFC</th><th>Folio</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody>
+                {% for cfdi in cfdis[:5] %}
+                    <tr>
+                        <td><strong>{{ cfdi.issuer_name or cfdi.issuer_rfc }}</strong></td>
+                        <td>{{ cfdi.client_name or cfdi.recipient_name }}</td>
+                        <td>{{ cfdi.recipient_rfc }}</td>
+                        <td>
+                            {% if cfdi.folio is not none %}
+                                {{ '...' ~ ('%04d'|format(cfdi.folio|int))[-4:] }}
+                            {% else %}
+                                {{ '...' ~ (cfdi.facturama_id|string)[-6:] }}
+                            {% endif %}
+                        </td>
+                        <td>${{ "%.2f"|format(cfdi.total) }}</td>
+                        <td><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}">{{ cfdi.status }}</span></td>
+                        <td><a href="{{ url_for('cfdi.cfdi_detail', cfdi_id=cfdi.id) }}" class="btn btn-sm btn-secondary">Ver</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% if cfdis|length > 5 %}<p style="margin-top:0.5rem;font-size:0.85rem;color:#888;">Y {{ cfdis|length - 5 }} más...</p>{% endif %}
+        {% if cfdis|length > 5 %}<p class="muted-note" style="margin-top:0.5rem;">Y {{ cfdis|length - 5 }} más...</p>{% endif %}
         {% else %}
-        <div class="empty-state"><p>No hay CFDIs. <a href="{{ url_for('cfdi.new_cfdi') }}">Crear el primero</a></p></div>
+        <div class="empty-state">
+            <p>No hay CFDIs todavía.</p>
+            <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">Crear primera factura</a>
+        </div>
         {% endif %}
-        <div style="margin-top:0.75rem;"><a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-sm btn-secondary">Ver todos</a></div>
+        <div class="form-actions"><a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-sm btn-secondary">Ver todos</a></div>
     </div>
 </div>
 {% endblock %}

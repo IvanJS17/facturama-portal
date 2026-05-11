@@ -1,16 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}CFDI {{ cfdi.facturama_id or cfdi.uuid[:8] }} — Facturama Portal{% endblock %}
+{% block title %}CFDI {{ cfdi.facturama_id or cfdi.uuid[:8] }} - Facturama Portal{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>CFDI {{ cfdi.facturama_id or (cfdi.uuid[:8] if cfdi.uuid else '—') }}</h1>
+    <div>
+        <h1>CFDI {{ cfdi.facturama_id or (cfdi.uuid[:8] if cfdi.uuid else '—') }}</h1>
+        <p class="page-subtitle">Consulta estado, datos fiscales y conceptos del comprobante.</p>
+    </div>
     <div class="actions">
         {% if cfdi.status == 'active' %}
-        <a href="{{ url_for('cfdi.cfdi_pdf', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📄 PDF</a>
-        <a href="{{ url_for('cfdi.cfdi_xml', cfdi_id=cfdi.id) }}" class="btn btn-secondary">📋 XML</a>
-        <form method="post" action="{{ url_for('cfdi.cancel_cfdi', cfdi_id=cfdi.id) }}" style="display:inline" onsubmit="return confirm('¿Cancelar este CFDI?');">
-            <select name="motive" style="padding:0.4rem;border:1px solid #ddd;border-radius:4px;">
+        <a href="{{ url_for('cfdi.cfdi_pdf', cfdi_id=cfdi.id) }}" class="btn btn-secondary">PDF</a>
+        <a href="{{ url_for('cfdi.cfdi_xml', cfdi_id=cfdi.id) }}" class="btn btn-secondary">XML</a>
+        <form method="post" action="{{ url_for('cfdi.cancel_cfdi', cfdi_id=cfdi.id) }}" class="inline-form" onsubmit="return confirm('¿Cancelar este CFDI?');">
+            <select name="motive">
                 <option value="02">Cancelar (02 - error)</option>
                 <option value="01">01 - Sustitución</option>
                 <option value="03">03 - No se llevó a cabo</option>
@@ -19,46 +22,36 @@
             <button type="submit" class="btn btn-danger">Cancelar CFDI</button>
         </form>
         {% endif %}
-        <a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-secondary">← Volver</a>
+        <a href="{{ url_for('cfdi.list_cfdis') }}" class="btn btn-secondary">Volver</a>
     </div>
 </div>
 
 {% if error %}
-<div class="card" style="border-left: 4px solid #e74c3c; background: #fdf2f2;">
-    <p style="color: #c0392b; margin: 0;"><strong>Error:</strong> {{ error }}</p>
-</div>
+<div class="alert alert-error"><strong>Error:</strong> {{ error }}</div>
 {% endif %}
 
-<div class="form-row">
-    <div class="card">
+<div class="content-grid">
+    <div class="card col-span-4">
         <h2>Estado</h2>
-        <p><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}" style="font-size:1rem;padding:0.4rem 0.8rem;">{{ cfdi.status|upper }}</span></p>
-        <p style="margin-top:0.5rem;"><strong>UUID:</strong> <code style="font-size:0.85rem;">{{ cfdi.uuid or '—' }}</code></p>
-        <p><strong>Folio:</strong> {{ cfdi.facturama_id or '—' }}</p>
-    </div>
-    <div class="card">
-        <h2>Totales</h2>
-        <p><strong>Total:</strong> ${{ "%.2f"|format(cfdi.total) }}</p>
-        {% if cfdi.cfdi_type %}<p><strong>Tipo:</strong> {{ cfdi.cfdi_type }}</p>{% endif %}
-        {% if cfdi.payment_form %}<p><strong>Forma de pago:</strong> {{ cfdi.payment_form }}</p>{% endif %}
-        {% if cfdi.payment_method %}<p><strong>Método:</strong> {{ cfdi.payment_method }}</p>{% endif %}
-    </div>
-</div>
-
-<div class="form-row">
-    <div class="card">
-        <h2>Datos del emisor</h2>
-        {% if cfdi.issuer_rfc or cfdi.issuer_name %}
-        <div class="detail-grid">
-            <div class="detail-item"><label>RFC</label><span style="font-weight:bold;">{{ cfdi.issuer_rfc or '—' }}</span></div>
-            <div class="detail-item"><label>Nombre / Razón Social</label><span>{{ cfdi.issuer_name or '—' }}</span></div>
+        <p><span class="badge badge-{{ 'active' if cfdi.status == 'active' else 'canceled' if cfdi.status == 'canceled' else 'pending' }}" style="font-size:0.88rem;padding:0.35rem 0.72rem;">{{ cfdi.status|upper }}</span></p>
+        <div class="detail-grid" style="margin-top:0.6rem;">
+            <div class="detail-item"><label>UUID</label><span><code>{{ cfdi.uuid or '—' }}</code></span></div>
+            <div class="detail-item"><label>Folio</label><span>{{ cfdi.facturama_id or '—' }}</span></div>
         </div>
-        {% else %}
-        <p style="color:#888;">Sin información del emisor (issuer_id={{ cfdi.issuer_id }})</p>
-        {% endif %}
     </div>
-    <div class="card">
-        <h2>Datos del receptor</h2>
+
+    <div class="card col-span-4">
+        <h2>Totales</h2>
+        <div class="detail-grid">
+            <div class="detail-item"><label>Total</label><span>${{ "%.2f"|format(cfdi.total) }}</span></div>
+            {% if cfdi.cfdi_type %}<div class="detail-item"><label>Tipo</label><span>{{ cfdi.cfdi_type }}</span></div>{% endif %}
+            {% if cfdi.payment_form %}<div class="detail-item"><label>Forma de pago</label><span>{{ cfdi.payment_form }}</span></div>{% endif %}
+            {% if cfdi.payment_method %}<div class="detail-item"><label>Método</label><span>{{ cfdi.payment_method }}</span></div>{% endif %}
+        </div>
+    </div>
+
+    <div class="card col-span-4">
+        <h2>Receptor</h2>
         <div class="detail-grid">
             <div class="detail-item"><label>RFC</label><span>{{ cfdi.recipient_rfc }}</span></div>
             <div class="detail-item"><label>Nombre</label><span>{{ cfdi.recipient_name or '—' }}</span></div>
@@ -66,37 +59,51 @@
     </div>
 </div>
 
+<div class="card">
+    <h2>Datos del emisor</h2>
+    {% if cfdi.issuer_rfc or cfdi.issuer_name %}
+    <div class="detail-grid">
+        <div class="detail-item"><label>RFC</label><span><strong>{{ cfdi.issuer_rfc or '—' }}</strong></span></div>
+        <div class="detail-item"><label>Nombre / Razón Social</label><span>{{ cfdi.issuer_name or '—' }}</span></div>
+    </div>
+    {% else %}
+    <p class="muted-note">Sin información del emisor (issuer_id={{ cfdi.issuer_id }})</p>
+    {% endif %}
+</div>
+
 {% if items %}
 <div class="card">
     <h2>Conceptos / Productos</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Producto</th>
-                <th>Código</th>
-                <th>Identificación</th>
-                <th>Unidad</th>
-                <th>Cant</th>
-                <th>Precio Unit</th>
-                <th>Subtotal</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for item in items %}
-            <tr>
-                <td>{{ item.product_name or item.name or item.description or '—' }}</td>
-                <td>{{ item.product_code or '—' }}</td>
-                <td>{{ item.identification_number or '—' }}</td>
-                <td>{{ item.unit or item.product_unit or '—' }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>${{ "%.2f"|format(item.unit_price or 0) }}</td>
-                <td>${{ "%.2f"|format(item.subtotal or 0) }}</td>
-                <td>${{ "%.2f"|format(item.total or 0) }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Código</th>
+                    <th>Identificación</th>
+                    <th>Unidad</th>
+                    <th>Cant</th>
+                    <th>Precio Unit</th>
+                    <th>Subtotal</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in items %}
+                <tr>
+                    <td>{{ item.product_name or item.name or item.description or '—' }}</td>
+                    <td>{{ item.product_code or '—' }}</td>
+                    <td>{{ item.identification_number or '—' }}</td>
+                    <td>{{ item.unit or item.product_unit or '—' }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>${{ "%.2f"|format(item.unit_price or 0) }}</td>
+                    <td>${{ "%.2f"|format(item.subtotal or 0) }}</td>
+                    <td>${{ "%.2f"|format(item.total or 0) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
 
@@ -104,8 +111,8 @@
 <div class="card">
     <h2>Datos originales del CFDI</h2>
     <details>
-        <summary style="cursor:pointer;color:#1a1a2e;">Ver payload guardado</summary>
-        <pre style="background:#f4f6f9;padding:0.75rem;border-radius:4px;overflow:auto;font-size:0.8rem;margin-top:0.5rem;max-height:400px;">{{ cfdi.raw_payload|tojson(indent=2) if cfdi.raw_payload is string else cfdi.raw_payload|pprint }}</pre>
+        <summary>Ver payload guardado</summary>
+        <pre style="background:#f4f7fd;padding:0.75rem;border-radius:10px;overflow:auto;font-size:0.8rem;margin-top:0.5rem;max-height:400px;">{{ cfdi.raw_payload|tojson(indent=2) if cfdi.raw_payload is string else cfdi.raw_payload|pprint }}</pre>
     </details>
 </div>
 {% endif %}

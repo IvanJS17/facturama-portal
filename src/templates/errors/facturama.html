@@ -2,26 +2,39 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Error — Facturama Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Error - Facturama Portal</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">🏢 Facturama Portal</div>
-        <div class="nav-links">
-            <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
-            <a href="{{ url_for('issuers.list_issuers') }}">Emisores</a>
-            <a href="{{ url_for('clients.list_clients') }}">Clientes</a>
-            <a href="{{ url_for('products.list_products') }}">Productos</a>
-            <a href="{{ url_for('cfdi.list_cfdis') }}">CFDIs</a>
-        </div>
-    </nav>
-    <main class="container">
-        <div class="card" style="border-left: 4px solid #dc3545;">
-            <h1 style="color:#dc3545;">Error de Facturama</h1>
-            <p style="margin-top:0.5rem;">{{ error.message or error }}</p>
-            <p style="margin-top:1rem;"><a href="javascript:history.back()" class="btn btn-secondary">← Volver</a></p>
-        </div>
-    </main>
+    <div class="app-shell">
+        <nav class="navbar">
+            <div class="navbar-inner">
+                <a class="nav-brand" href="{{ url_for('dashboard.index') }}">
+                    <span aria-hidden="true">🏢</span>
+                    <span>Facturama Portal</span>
+                </a>
+                <div class="nav-links">
+                    <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
+                    <a href="{{ url_for('issuers.list_issuers') }}">Emisores</a>
+                    <a href="{{ url_for('clients.list_clients') }}">Clientes</a>
+                    <a href="{{ url_for('products.list_products') }}">Productos</a>
+                    <a href="{{ url_for('cfdi.list_cfdis') }}">CFDIs</a>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container">
+            <div class="card">
+                <p class="step-chip">Error de servicio</p>
+                <h1 style="color:#a3303b;margin-top:0.35rem;">No pudimos completar la operación</h1>
+                <p class="page-subtitle" style="margin-top:0.5rem;">{{ error.message or error }}</p>
+                <div class="form-actions" style="margin-top:1rem;">
+                    <a href="javascript:history.back()" class="btn btn-secondary">Volver</a>
+                    <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary">Ir al dashboard</a>
+                </div>
+            </div>
+        </main>
+    </div>
 </body>
 </html>

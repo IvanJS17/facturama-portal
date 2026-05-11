@@ -1,50 +1,55 @@
 {% extends "base.html" %}
 
-{% block title %}Emisores — Facturama Portal{% endblock %}
+{% block title %}Emisores - Facturama Portal{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Emisores</h1>
-    <a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-primary">+ Agregar emisor</a>
+    <div>
+        <h1>Emisores</h1>
+        <p class="page-subtitle">Administra tus emisores y su configuración fiscal.</p>
+    </div>
+    <a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-primary">Agregar emisor</a>
 </div>
 
 <div class="card">
     {% if issuers %}
-    <table>
-        <thead>
-            <tr>
-                <th>RFC</th>
-                <th>Nombre legal</th>
-                <th>Régimen fiscal</th>
-                <th>Código postal</th>
-                <th>Activo</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for issuer in issuers %}
-            <tr>
-                <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}">{{ issuer.rfc }}</a></td>
-                <td>{{ issuer.legal_name }}</td>
-                <td>{{ issuer.tax_regime }}</td>
-                <td>{{ issuer.zip_code }}</td>
-                <td><span class="badge badge-{{ 'active' if issuer.active else 'canceled' }}">{{ 'Sí' if issuer.active else 'No' }}</span></td>
-                <td>
-                    <a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Editar</a>
-                    <a href="{{ url_for('clients.list_clients', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Ver clientes</a>
-                    <a href="{{ url_for('clients.new_client', issuer_id=issuer.id) }}" class="btn btn-sm btn-primary">Agregar cliente</a>
-                    <form method="post" action="{{ url_for('issuers.delete_issuer', issuer_id=issuer.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar emisor?');">
-                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                    </form>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>RFC</th>
+                    <th>Nombre legal</th>
+                    <th>Régimen fiscal</th>
+                    <th>Código postal</th>
+                    <th>Activo</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for issuer in issuers %}
+                <tr>
+                    <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}">{{ issuer.rfc }}</a></td>
+                    <td>{{ issuer.legal_name }}</td>
+                    <td>{{ issuer.tax_regime }}</td>
+                    <td>{{ issuer.zip_code }}</td>
+                    <td><span class="badge badge-{{ 'active' if issuer.active else 'canceled' }}">{{ 'Sí' if issuer.active else 'No' }}</span></td>
+                    <td class="actions">
+                        <a href="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Editar</a>
+                        <a href="{{ url_for('clients.list_clients', issuer_id=issuer.id) }}" class="btn btn-sm btn-secondary">Ver clientes</a>
+                        <a href="{{ url_for('clients.new_client', issuer_id=issuer.id) }}" class="btn btn-sm btn-primary">Agregar cliente</a>
+                        <form method="post" action="{{ url_for('issuers.delete_issuer', issuer_id=issuer.id) }}" class="inline-form" onsubmit="return confirm('¿Eliminar emisor?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
     <div class="empty-state">
         <p>No hay emisores registrados.</p>
-        <a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-primary" style="margin-top:0.5rem;">+ Agregar el primer emisor</a>
+        <a href="{{ url_for('issuers.new_issuer') }}" class="btn btn-primary">Agregar el primer emisor</a>
     </div>
     {% endif %}
 </div>
