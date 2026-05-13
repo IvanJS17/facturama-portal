@@ -514,7 +514,18 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-#### 6. Crear `.env` de producción
+#### 6. Crear archivo wsgi.py (entry point para Gunicorn)
+
+El proyecto usa factory pattern (`create_app()`). Gunicorn necesita un objeto `app` a nivel módulo:
+
+```bash
+cat > /opt/facturama-portal/wsgi.py << 'EOF'
+from src.app import create_app
+app = create_app()
+EOF
+```
+
+#### 7. Crear `.env` de producción
 
 ```bash
 nano .env
@@ -547,21 +558,22 @@ Ajustar permisos del `.env`:
 chmod 600 .env
 ```
 
-#### 7. Verificar instalación
+#### 8. Verificar instalación
 
 ```bash
 pytest tests/ -v --tb=short
 # Deben pasar 45 tests
 
-# Probar arranque rápido
-flask run --host=0.0.0.0 --port=5000 &
+# Probar que la app carga
+source .venv/bin/activate
+gunicorn wsgi:app --bind 0.0.0.0:5000 --daemon
 sleep 2
 curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/
 # Debe devolver 200
-kill %1
+pkill gunicorn
 ```
 
-#### 8. Configurar systemd para el portal
+#### 9. Configurar systemd para el portal
 
 ```bash
 sudo nano /etc/systemd/system/facturama-portal.service
@@ -576,7 +588,7 @@ After=network.target
 User=facturama
 WorkingDirectory=/opt/facturama-portal
 EnvironmentFile=/opt/facturama-portal/.env
-ExecStart=/opt/facturama-portal/.venv/bin/gunicorn src.app:app --bind 127.0.0.1:5000 --workers 4 --timeout 120
+ExecStart=/opt/facturama-portal/.venv/bin/gunicorn wsgi:app --bind 127.0.0.1:5000 --workers 4 --timeout 120
 Restart=always
 RestartSec=5
 
@@ -593,7 +605,7 @@ sudo systemctl start facturama-portal
 sudo systemctl status facturama-portal
 ```
 
-#### 9. Configurar dominio y HTTPS
+#### 10. Configurar dominio y HTTPS
 
 Si tienes un dominio (ej. `facturama.socium.mx`), apunta un registro A a la IP del VPS. Luego:
 
@@ -644,7 +656,7 @@ Certbot configura la renovación automática (cada 90 días). Verificar:
 sudo certbot renew --dry-run
 ```
 
-#### 10. Firewall
+#### 11. Firewall
 
 ```bash
 sudo ufw default deny incoming
@@ -656,7 +668,7 @@ sudo ufw enable
 sudo ufw status verbose
 ```
 
-#### 11. Instalar el agente Hermes en el VPS
+#### 12. Instalar el agente Hermes en el VPS
 
 ```bash
 # Como usuario facturama (no root)
@@ -669,7 +681,7 @@ hermes connect telegram
 
 El agente vive como proceso en background y recibe tus mensajes por Telegram. Desde ahí puede administrar el portal: monitorear, reiniciar, depurar, agregar features.
 
-#### 12. Verificación final
+#### 13. Verificación final
 
 ```bash
 # Portal responde
@@ -708,18 +720,19 @@ Si eres un agente AI encargado de desplegar este proyecto en un VPS Hetzner nuev
 [ ] 7. chown -R facturama:facturama /opt/facturama-portal
 [ ] 8. Crear venv:                       python3 -m venv .venv && source .venv/bin/activate
 [ ] 9. Instalar:                         pip install -e ".[dev]"
-[ ]10. Crear .env con credenciales de PRODUCCIÓN (NO sandbox)
-[ ]11. chmod 600 .env
-[ ]12. pytest tests/ -v --tb=short       # 45 tests deben pasar
-[ ]13. Crear /etc/systemd/system/facturama-portal.service
-[ ]14. systemctl enable facturama-portal && systemctl start facturama-portal
-[ ]15. curl localhost:5000 → 200
-[ ]16. Configurar Nginx + Certbot para HTTPS
-[ ]17. Configurar ufw: solo 22, 80, 443
-[ ]18. Instalar Hermes: bash <(curl -fsSL https://hermes.nousresearch.com/install.sh)
-[ ]19. hermes setup && hermes connect telegram
-[ ]20. Verificar dominio con HTTPS:      curl https://<dominio> → 200
-[ ]21. Probar flujo completo: navegar dashboard, crear emisor, timbrar factura, generar PDF
+[ ]10. Crear wsgi.py:                     echo 'from src.app import create_app\napp = create_app()' > wsgi.py
+[ ]11. Crear .env con credenciales de PRODUCCIÓN (NO sandbox)
+[ ]12. chmod 600 .env
+[ ]13. pytest tests/ -v --tb=short       # 45 tests deben pasar
+[ ]14. Crear /etc/systemd/system/facturama-portal.service (usar wsgi:app)
+[ ]15. systemctl enable facturama-portal && systemctl start facturama-portal
+[ ]16. curl localhost:5000 → 200
+[ ]17. Configurar Nginx + Certbot para HTTPS
+[ ]18. Configurar ufw: solo 22, 80, 443
+[ ]19. Instalar Hermes: bash <(curl -fsSL https://hermes.nousresearch.com/install.sh)
+[ ]20. hermes setup && hermes connect telegram
+[ ]21. Verificar dominio con HTTPS:      curl https://<dominio> → 200
+[ ]22. Probar flujo completo: navegar dashboard, crear emisor, timbrar factura, generar PDF
 ```
 
 ### Seguridad en el VPS
