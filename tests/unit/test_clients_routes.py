@@ -101,3 +101,20 @@ def test_create_client_saves_under_selected_issuer_and_redirects_to_edit(tmp_pat
     assert len(clients) == 1
     assert clients[0]["issuer_id"] == issuer_id
     assert clients[0]["issuer_name"] == "Issuer A"
+
+
+def test_client_form_actions_point_to_create_and_update_routes(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    new_response = app.test_client().get("/clients/new")
+
+    assert new_response.status_code == 200
+    assert b'<form method="post" action="/clients/">' in new_response.data
+
+    client_id = database.upsert_client(client_payload(issuer_id))
+    edit_response = app.test_client().get(f"/clients/{client_id}/edit")
+
+    assert edit_response.status_code == 200
+    assert f'<form method="post" action="/clients/{client_id}">'.encode() in edit_response.data

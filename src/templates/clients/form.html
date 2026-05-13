@@ -11,7 +11,7 @@
 </div>
 
 <div class="card">
-    <form method="post">
+    <form method="post" action="{{ url_for('clients.update_client', client_id=client.id) if client else url_for('clients.create_client') }}">
         <div class="form-section">
             <h3>Vinculación de emisor</h3>
             <div class="form-group">

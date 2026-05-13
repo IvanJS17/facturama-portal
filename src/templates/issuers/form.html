@@ -11,7 +11,7 @@
 </div>
 
 <div class="card">
-    <form method="post">
+    <form method="post" action="{{ url_for('issuers.update_issuer', issuer_id=issuer.id) if issuer else url_for('issuers.create_issuer') }}">
         <div class="form-section">
             <h3>Datos fiscales</h3>
             <div class="form-row">

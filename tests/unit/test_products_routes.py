@@ -178,3 +178,20 @@ def test_api_products_filter_by_issuer(tmp_path):
     data = response.get_json()
     assert [row["id"] for row in data] == [product_a]
     assert all(row["issuer_id"] == issuer_a for row in data)
+
+
+def test_product_form_actions_point_to_create_and_update_routes(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))
+    app = make_app(database)
+
+    new_response = app.test_client().get("/products/new")
+
+    assert new_response.status_code == 200
+    assert b'<form method="post" action="/products/">' in new_response.data
+
+    product_id = database.upsert_product(product_payload(issuer_id, "Servicio A", "A-1"))
+    edit_response = app.test_client().get(f"/products/{product_id}/edit")
+
+    assert edit_response.status_code == 200
+    assert f'<form method="post" action="/products/{product_id}">'.encode() in edit_response.data

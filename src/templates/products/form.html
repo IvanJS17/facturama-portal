@@ -11,7 +11,7 @@
 </div>
 
 <div class="card">
-    <form method="post">
+    <form method="post" action="{{ url_for('products.update_product', product_id=product.id) if product else url_for('products.create_product') }}">
         <div class="form-section">
             <h3>Asignación y precio</h3>
             <div class="form-group">
