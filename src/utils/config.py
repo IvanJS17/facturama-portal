@@ -19,6 +19,7 @@ class Config:
     flask_app: str = "src.app"
     flask_env: str = "development"
     secret_key: str = "change-me-in-production"
+    admin_password: str = "change-me-admin-password"
 
     # Database
     database_url: str = "sqlite:///facturama_portal.db"
@@ -33,6 +34,7 @@ class Config:
             flask_app=os.getenv("FLASK_APP", "src.app"),
             flask_env=os.getenv("FLASK_ENV", "development"),
             secret_key=os.getenv("SECRET_KEY", "change-me-in-production"),
+            admin_password=os.getenv("ADMIN_PASSWORD", "change-me-admin-password"),
             database_url=os.getenv("DATABASE_URL", "sqlite:///facturama_portal.db"),
         )
 

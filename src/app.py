@@ -1,6 +1,6 @@
 """Flask application factory and configuration."""
 
-from flask import Flask, render_template
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 from dotenv import load_dotenv
 
 from src.models import PortalDatabase
@@ -19,6 +19,7 @@ def create_app() -> Flask:
     app.config["FACTURAMA_API_URL"] = config.facturama_api_url
     app.config["DATABASE_URL"] = config.database_url
     app.config["PORTAL_CONFIG"] = config
+    app.config["ADMIN_PASSWORD"] = config.admin_password
 
     database = PortalDatabase(config.database_url)
     database.init_schema()
@@ -37,6 +38,42 @@ def create_app() -> Flask:
     app.register_blueprint(products.api_bp)
     app.register_blueprint(reports.bp)
     app.register_blueprint(reports.api_bp)
+
+    @app.before_request
+    def require_authentication():
+        if request.path in {"/health", "/login"} or request.path.startswith("/static/"):
+            return None
+
+        if session.get("is_authenticated"):
+            return None
+
+        next_url = request.full_path if request.query_string else request.path
+        return redirect(url_for("login", next=next_url))
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if session.get("is_authenticated"):
+            return redirect(url_for("dashboard.index"))
+
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            if password == app.config.get("ADMIN_PASSWORD"):
+                session["is_authenticated"] = True
+                flash("Sesion iniciada correctamente.", "success")
+                next_url = request.args.get("next")
+                if next_url and next_url.startswith("/"):
+                    return redirect(next_url)
+                return redirect(url_for("dashboard.index"))
+
+            flash("Contrasena incorrecta.", "error")
+
+        return render_template("login.html")
+
+    @app.route("/logout")
+    def logout():
+        session.clear()
+        flash("Sesion cerrada.", "info")
+        return redirect(url_for("login"))
 
     @app.route("/health")
     def health():

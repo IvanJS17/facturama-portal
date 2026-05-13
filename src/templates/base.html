@@ -15,6 +15,7 @@
                     <span>Facturama Portal</span>
                 </a>
                 <div class="nav-links" id="main-nav-links">
+                    {% if session.get("is_authenticated") %}
                     <a href="{{ url_for('dashboard.index') }}" data-nav="dashboard">Dashboard</a>
                     <a href="{{ url_for('issuers.list_issuers') }}" data-nav="issuers">Emisores</a>
                     <a href="{{ url_for('clients.list_clients') }}" data-nav="clients">Clientes</a>
@@ -22,6 +23,8 @@
                     <a href="/reports" data-nav="reports">Reportes</a>
                     <a href="{{ url_for('cfdi.list_cfdis') }}" data-nav="cfdi">CFDIs</a>
                     <a href="{{ url_for('cfdi.new_cfdi') }}" class="nav-cta" data-nav="cfdi-new">Nueva Factura</a>
+                    <a href="{{ url_for('logout') }}">Cerrar sesion</a>
+                    {% endif %}
                 </div>
             </div>
         </nav>

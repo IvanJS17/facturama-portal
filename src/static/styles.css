@@ -140,6 +140,17 @@ summary:focus-visible {
     margin: 1.25rem auto 0;
 }
 
+.auth-wrap {
+    min-height: calc(100vh - 210px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-card {
+    width: min(460px, 100%);
+}
+
 .page-header {
     display: flex;
     justify-content: space-between;
