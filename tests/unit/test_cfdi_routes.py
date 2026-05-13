@@ -2,6 +2,10 @@ from flask import Flask
 
 from src.models import PortalDatabase
 from src.routes import cfdi as cfdi_routes
+from src.routes import clients as client_routes
+from src.routes import dashboard as dashboard_routes
+from src.routes import issuers as issuer_routes
+from src.routes import products as product_routes
 from src.services.facturama_api import FacturamaAPI
 from src.utils.config import Config
 
@@ -72,9 +76,13 @@ class FakeCfdiAPI:
 
 
 def make_app(database, fake_api, monkeypatch):
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder="../../src/templates")
     app.config.update(TESTING=True, SECRET_KEY="test")
     app.extensions["portal_db"] = database
+    app.register_blueprint(dashboard_routes.bp)
+    app.register_blueprint(client_routes.bp)
+    app.register_blueprint(issuer_routes.bp)
+    app.register_blueprint(product_routes.bp)
     app.register_blueprint(cfdi_routes.bp)
     app.register_blueprint(cfdi_routes.api_bp)
     monkeypatch.setattr(cfdi_routes, "api", lambda: fake_api)
@@ -127,6 +135,17 @@ def test_api_create_cfdi_rejects_client_from_another_issuer(tmp_path, monkeypatc
     assert response.status_code == 400
     assert response.get_json() == {"error": "Selected client does not belong to selected issuer"}
     assert fake_api.created_payloads == []
+
+
+def test_new_cfdi_form_posts_to_create_route(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    fake_api = FakeCfdiAPI(database)
+    app = make_app(database, fake_api, monkeypatch)
+
+    response = app.test_client().get("/cfdi/new")
+
+    assert response.status_code == 200
+    assert b'<form method="post" action="/cfdi/" id="cfdi-form" class="step-shell">' in response.data
 
 
 def test_web_create_cfdi_rejects_product_from_another_issuer(tmp_path, monkeypatch):
