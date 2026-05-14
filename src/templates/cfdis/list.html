@@ -14,6 +14,19 @@
 <div class="card">
     <form method="get" class="filter-bar">
         <div class="filter-field">
+            <label class="filter-label" for="issuer_id">Emisor</label>
+            <select id="issuer_id" name="issuer_id">
+                <option value="">Todos los emisores</option>
+                {% for issuer in issuers %}
+                <option value="{{ issuer.id }}" {{ 'selected' if issuer_id == issuer.id else '' }}>{{ issuer.rfc }} - {{ issuer.legal_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="q">Buscar</label>
+            <input id="q" type="search" name="q" value="{{ q }}" placeholder="Cliente o folio">
+        </div>
+        <div class="filter-field">
             <label class="filter-label" for="recipient_rfc">RFC receptor</label>
             <input id="recipient_rfc" type="search" name="recipient_rfc" value="{{ recipient_rfc }}" placeholder="Buscar por RFC receptor..." aria-label="RFC receptor">
         </div>
@@ -23,6 +36,23 @@
                 <option value="">Todos los estados</option>
                 <option value="active" {{ 'selected' if status == 'active' else '' }}>Activos</option>
                 <option value="canceled" {{ 'selected' if status == 'canceled' else '' }}>Cancelados</option>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="date_from">Desde</label>
+            <input id="date_from" type="date" name="date_from" value="{{ date_from }}">
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="date_to">Hasta</label>
+            <input id="date_to" type="date" name="date_to" value="{{ date_to }}">
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="sort">Ordenar</label>
+            <select id="sort" name="sort">
+                <option value="newest" {{ 'selected' if sort == 'newest' else '' }}>Más recientes</option>
+                <option value="oldest" {{ 'selected' if sort == 'oldest' else '' }}>Más antiguos</option>
+                <option value="total_desc" {{ 'selected' if sort == 'total_desc' else '' }}>Total mayor</option>
+                <option value="total_asc" {{ 'selected' if sort == 'total_asc' else '' }}>Total menor</option>
             </select>
         </div>
         <button type="submit" class="btn btn-secondary">Filtrar</button>

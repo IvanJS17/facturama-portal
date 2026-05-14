@@ -655,9 +655,24 @@ class PortalDatabase:
             """
         )
 
-    def list_issuers(self) -> list[sqlite3.Row]:
+    def list_issuers(self, q: str = "", sort: str = "name_asc") -> list[sqlite3.Row]:
+        where_clauses: list[str] = []
+        params: list[str] = []
+        search = q.strip()
+        if search:
+            where_clauses.append("(UPPER(legal_name) LIKE ? OR UPPER(rfc) LIKE ?)")
+            like = f"%{search.upper()}%"
+            params.extend([like, like])
+
+        sort_sql = {
+            "name_asc": "legal_name ASC",
+            "name_desc": "legal_name DESC",
+            "newest": "created_at DESC, id DESC",
+            "oldest": "created_at ASC, id ASC",
+        }.get(sort, "legal_name ASC")
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         with self.connect() as conn:
-            return conn.execute("SELECT * FROM issuers ORDER BY active DESC, legal_name").fetchall()
+            return conn.execute(f"SELECT * FROM issuers {where_sql} ORDER BY {sort_sql}", params).fetchall()
 
     def get_issuer(self, issuer_id: int) -> sqlite3.Row | None:
         with self.connect() as conn:
@@ -700,20 +715,39 @@ class PortalDatabase:
         with self.connect() as conn:
             conn.execute("DELETE FROM issuers WHERE id = ?", (issuer_id,))
 
-    def list_clients(self, issuer_id: int | None = None) -> list[sqlite3.Row]:
+    def list_clients(
+        self,
+        issuer_id: int | None = None,
+        q: str = "",
+        sort: str = "name_asc",
+    ) -> list[sqlite3.Row]:
         base = """
             SELECT c.*, i.legal_name AS issuer_name, i.rfc AS issuer_rfc
             FROM clients c
             LEFT JOIN issuers i ON i.id = c.issuer_id
         """
+        where_clauses: list[str] = []
+        params: list[str] = []
         if issuer_id is not None:
-            with self.connect() as conn:
-                return conn.execute(
-                    f"{base} WHERE c.issuer_id = ? ORDER BY c.legal_name",
-                    (issuer_id,),
-                ).fetchall()
+            where_clauses.append("c.issuer_id = ?")
+            params.append(str(issuer_id))
+        search = q.strip()
+        if search:
+            like = f"%{search.upper()}%"
+            where_clauses.append(
+                "(UPPER(c.legal_name) LIKE ? OR UPPER(c.rfc) LIKE ? OR UPPER(COALESCE(c.facturama_id, '')) LIKE ?)"
+            )
+            params.extend([like, like, like])
+        sort_sql = {
+            "name_asc": "c.legal_name ASC, c.id ASC",
+            "name_desc": "c.legal_name DESC, c.id DESC",
+            "newest": "c.created_at DESC, c.id DESC",
+            "oldest": "c.created_at ASC, c.id ASC",
+            "rfc_asc": "c.rfc ASC, c.id ASC",
+        }.get(sort, "c.legal_name ASC, c.id ASC")
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         with self.connect() as conn:
-            return conn.execute(f"{base} ORDER BY c.legal_name").fetchall()
+            return conn.execute(f"{base} {where_sql} ORDER BY {sort_sql}", params).fetchall()
 
     def get_client(self, client_id: int) -> sqlite3.Row | None:
         with self.connect() as conn:
@@ -870,20 +904,40 @@ class PortalDatabase:
     def _default_issuer_id(self, conn: sqlite3.Connection) -> int | None:
         return _first_issuer_id(conn)
 
-    def list_products(self, issuer_id: int | None = None) -> list[sqlite3.Row]:
+    def list_products(
+        self,
+        issuer_id: int | None = None,
+        q: str = "",
+        sort: str = "name_asc",
+    ) -> list[sqlite3.Row]:
         base = """
             SELECT p.*, i.legal_name AS issuer_name, i.rfc AS issuer_rfc
             FROM products p
             LEFT JOIN issuers i ON i.id = p.issuer_id
         """
+        where_clauses: list[str] = []
+        params: list[str] = []
         if issuer_id is not None:
-            with self.connect() as conn:
-                return conn.execute(
-                    f"{base} WHERE p.issuer_id = ? ORDER BY p.name",
-                    (issuer_id,),
-                ).fetchall()
+            where_clauses.append("p.issuer_id = ?")
+            params.append(str(issuer_id))
+        search = q.strip()
+        if search:
+            like = f"%{search.upper()}%"
+            where_clauses.append(
+                "(UPPER(p.name) LIKE ? OR UPPER(COALESCE(p.identification_number, '')) LIKE ? OR UPPER(COALESCE(p.product_code, '')) LIKE ?)"
+            )
+            params.extend([like, like, like])
+        sort_sql = {
+            "name_asc": "p.name ASC, p.id ASC",
+            "name_desc": "p.name DESC, p.id DESC",
+            "newest": "p.created_at DESC, p.id DESC",
+            "oldest": "p.created_at ASC, p.id ASC",
+            "price_asc": "p.price ASC, p.id ASC",
+            "price_desc": "p.price DESC, p.id DESC",
+        }.get(sort, "p.name ASC, p.id ASC")
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         with self.connect() as conn:
-            return conn.execute(f"{base} ORDER BY p.name").fetchall()
+            return conn.execute(f"{base} {where_sql} ORDER BY {sort_sql}", params).fetchall()
 
     def get_product(self, product_id: int) -> sqlite3.Row | None:
         with self.connect() as conn:
@@ -977,7 +1031,16 @@ class PortalDatabase:
         with self.connect() as conn:
             conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
 
-    def list_cfdis(self, recipient_rfc: str = "", status: str = "") -> list[sqlite3.Row]:
+    def list_cfdis(
+        self,
+        recipient_rfc: str = "",
+        status: str = "",
+        issuer_id: int | None = None,
+        q: str = "",
+        sort: str = "newest",
+        date_from: str = "",
+        date_to: str = "",
+    ) -> list[sqlite3.Row]:
         where_clauses: list[str] = []
         params: list[str] = []
         recipient_rfc = recipient_rfc.strip()
@@ -989,8 +1052,30 @@ class PortalDatabase:
         if status:
             where_clauses.append("c.status = ?")
             params.append(status)
+        if issuer_id is not None:
+            where_clauses.append("c.issuer_id = ?")
+            params.append(str(issuer_id))
+        search = q.strip()
+        if search:
+            like = f"%{search.upper()}%"
+            where_clauses.append(
+                "(UPPER(COALESCE(c.recipient_name, '')) LIKE ? OR UPPER(COALESCE(cl.legal_name, '')) LIKE ? OR UPPER(COALESCE(c.facturama_id, '')) LIKE ?)"
+            )
+            params.extend([like, like, like])
+        if date_from.strip():
+            where_clauses.append("DATE(c.created_at) >= DATE(?)")
+            params.append(date_from.strip())
+        if date_to.strip():
+            where_clauses.append("DATE(c.created_at) <= DATE(?)")
+            params.append(date_to.strip())
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        sort_sql = {
+            "newest": "c.created_at DESC, c.id DESC",
+            "oldest": "c.created_at ASC, c.id ASC",
+            "total_desc": "c.total DESC, c.id DESC",
+            "total_asc": "c.total ASC, c.id ASC",
+        }.get(sort, "c.created_at DESC, c.id DESC")
         with self.connect() as conn:
             return conn.execute(
                 f"""
@@ -1002,7 +1087,7 @@ class PortalDatabase:
                 LEFT JOIN issuers i ON i.id = c.issuer_id
                 LEFT JOIN clients cl ON cl.id = c.client_id
                 {where_sql}
-                ORDER BY c.created_at DESC
+                ORDER BY {sort_sql}
                 """,
                 params,
             ).fetchall()

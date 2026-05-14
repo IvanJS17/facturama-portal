@@ -201,3 +201,61 @@ def test_api_create_cfdi_persists_client_and_item_links(tmp_path, monkeypatch):
     assert item["total"] == 290
     assert fake_api.created_payloads[0]["Serie"] == "FAC"
     assert fake_api.created_payloads[0]["Folio"] == "10"
+
+
+def test_cfdi_list_supports_search_status_issuer_sort_and_safe_invalid_sort(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    issuer_a, issuer_b, client_a, client_b, _, _ = seed_two_issuers(database)
+    database.save_cfdi(
+        {
+            "facturama_id": "folio-zeta",
+            "issuer_id": issuer_a,
+            "client_id": client_a,
+            "recipient_rfc": "ACA010101ABC",
+            "recipient_name": "Cliente Zeta",
+            "status": "active",
+            "total": 100,
+        }
+    )
+    database.save_cfdi(
+        {
+            "facturama_id": "folio-alfa",
+            "issuer_id": issuer_a,
+            "client_id": client_a,
+            "recipient_rfc": "ACA010101ABC",
+            "recipient_name": "Cliente Alfa",
+            "status": "canceled",
+            "total": 200,
+        }
+    )
+    database.save_cfdi(
+        {
+            "facturama_id": "folio-other",
+            "issuer_id": issuer_b,
+            "client_id": client_b,
+            "recipient_rfc": "ACB010101ABC",
+            "recipient_name": "Cliente Externo",
+            "status": "active",
+            "total": 300,
+        }
+    )
+    fake_api = FakeCfdiAPI(database)
+    app = make_app(database, fake_api, monkeypatch)
+    client = app.test_client()
+
+    filtered = client.get(f"/cfdi/?issuer_id={issuer_a}&q=alfa&status=canceled&sort=total_desc")
+    assert filtered.status_code == 200
+    assert b"ACME A" in filtered.data
+    assert b"Cliente Zeta" not in filtered.data
+    assert b"Acme B" not in filtered.data
+    assert b'name="q"' in filtered.data
+    assert b'value="alfa"' in filtered.data
+    assert (f'value="{issuer_a}" selected').encode() in filtered.data
+    assert b'<option value="canceled" selected>' in filtered.data
+
+    sort_response = client.get(f"/cfdi/?issuer_id={issuer_a}&sort=total_asc")
+    assert sort_response.status_code == 200
+    assert sort_response.data.find(b"$100.00") < sort_response.data.find(b"$200.00")
+
+    invalid_sort_response = client.get(f"/cfdi/?issuer_id={issuer_a}&sort=bad")
+    assert invalid_sort_response.status_code == 200

@@ -195,3 +195,31 @@ def test_product_form_actions_point_to_create_and_update_routes(tmp_path):
 
     assert edit_response.status_code == 200
     assert f'<form method="post" action="/products/{product_id}">'.encode() in edit_response.data
+
+
+def test_products_list_supports_search_sort_and_safe_invalid_sort(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload("Issuer B", "BBB010101BBB"))
+    database.upsert_product(product_payload(issuer_a, "Servicio Zeta", "SKU-Z"))
+    database.upsert_product(product_payload(issuer_a, "Servicio Alfa", "SKU-A"))
+    database.upsert_product(product_payload(issuer_b, "Servicio Externo", "SKU-X"))
+    app = make_app(database)
+    client = app.test_client()
+
+    search_response = client.get(f"/products/?issuer_id={issuer_a}&q=sku-a")
+    assert search_response.status_code == 200
+    assert b"Servicio Alfa" in search_response.data
+    assert b"Servicio Zeta" not in search_response.data
+    assert b"Servicio Externo" not in search_response.data
+    assert b'name="q"' in search_response.data
+    assert b'value="sku-a"' in search_response.data
+    assert (f'value="{issuer_a}" selected').encode() in search_response.data
+
+    sort_response = client.get(f"/products/?issuer_id={issuer_a}&sort=name_desc")
+    assert sort_response.status_code == 200
+    assert sort_response.data.find(b"Servicio Zeta") < sort_response.data.find(b"Servicio Alfa")
+
+    invalid_sort_response = client.get(f"/products/?issuer_id={issuer_a}&sort=bad")
+    assert invalid_sort_response.status_code == 200
+    assert invalid_sort_response.data.find(b"Servicio Alfa") < invalid_sort_response.data.find(b"Servicio Zeta")

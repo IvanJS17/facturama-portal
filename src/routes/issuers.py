@@ -33,7 +33,9 @@ def _read_limited_upload(file_storage, max_bytes: int) -> bytes:
 
 @bp.get("/")
 def list_issuers():
-    return render_template("issuers/list.html", issuers=db().list_issuers())
+    q = (request.args.get("q") or "").strip()
+    sort = (request.args.get("sort") or "name_asc").strip()
+    return render_template("issuers/list.html", issuers=db().list_issuers(q=q, sort=sort), q=q, sort=sort)
 
 
 @bp.get("/new")

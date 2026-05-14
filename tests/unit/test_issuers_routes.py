@@ -199,3 +199,26 @@ def test_issuer_edit_renders_issuer_products_and_add_product_link(tmp_path):
     assert b"Servicio B" not in response.data
     assert f"/products/new?issuer_id={issuer_a}".encode() in response.data
     assert f"/products/{product_a}/edit".encode() in response.data
+
+
+def test_issuers_list_search_and_sort_and_invalid_sort_fallback(tmp_path):
+    database = make_db(tmp_path)
+    database.save_issuer(issuer_payload(name="Zulu Corp", rfc="ZZZ010101ZZZ"))
+    database.save_issuer(issuer_payload(name="Alpha Corp", rfc="AAA010101AAA"))
+    app = make_app(database)
+    client = app.test_client()
+
+    search_response = client.get("/issuers/?q=alpha")
+    assert search_response.status_code == 200
+    assert b"ALPHA CORP" in search_response.data
+    assert b"ZULU CORP" not in search_response.data
+    assert b'name="q"' in search_response.data
+    assert b'value="alpha"' in search_response.data
+
+    sort_response = client.get("/issuers/?sort=name_desc")
+    assert sort_response.status_code == 200
+    assert sort_response.data.find(b"ZULU CORP") < sort_response.data.find(b"ALPHA CORP")
+
+    invalid_sort_response = client.get("/issuers/?sort=drop_table")
+    assert invalid_sort_response.status_code == 200
+    assert invalid_sort_response.data.find(b"ALPHA CORP") < invalid_sort_response.data.find(b"ZULU CORP")

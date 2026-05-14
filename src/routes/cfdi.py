@@ -81,11 +81,30 @@ def _local_cfdi_links(
 def list_cfdis():
     recipient_rfc = request.args.get("recipient_rfc", "").strip()
     status = request.args.get("status", "").strip()
+    issuer_id = request.args.get("issuer_id", type=int)
+    q = (request.args.get("q") or "").strip()
+    sort = (request.args.get("sort") or "newest").strip()
+    date_from = (request.args.get("date_from") or "").strip()
+    date_to = (request.args.get("date_to") or "").strip()
     return render_template(
         "cfdis/list.html",
-        cfdis=db().list_cfdis(recipient_rfc=recipient_rfc, status=status),
+        cfdis=db().list_cfdis(
+            recipient_rfc=recipient_rfc,
+            status=status,
+            issuer_id=issuer_id,
+            q=q,
+            sort=sort,
+            date_from=date_from,
+            date_to=date_to,
+        ),
+        issuers=db().list_issuers(),
         recipient_rfc=recipient_rfc,
         status=status,
+        issuer_id=issuer_id,
+        q=q,
+        sort=sort,
+        date_from=date_from,
+        date_to=date_to,
     )
 
 
@@ -233,7 +252,25 @@ def api_list_cfdis():
         return jsonify(api().list_cfdis(filters))
     recipient_rfc = request.args.get("recipient_rfc", "").strip()
     status = request.args.get("status", "").strip()
-    return jsonify([dict(row) for row in db().list_cfdis(recipient_rfc=recipient_rfc, status=status)])
+    issuer_id = request.args.get("issuer_id", type=int)
+    q = (request.args.get("q") or "").strip()
+    sort = (request.args.get("sort") or "newest").strip()
+    date_from = (request.args.get("date_from") or "").strip()
+    date_to = (request.args.get("date_to") or "").strip()
+    return jsonify(
+        [
+            dict(row)
+            for row in db().list_cfdis(
+                recipient_rfc=recipient_rfc,
+                status=status,
+                issuer_id=issuer_id,
+                q=q,
+                sort=sort,
+                date_from=date_from,
+                date_to=date_to,
+            )
+        ]
+    )
 
 
 @api_bp.post("/")

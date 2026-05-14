@@ -21,15 +21,31 @@
     <form method="get" class="filter-bar">
         <div class="filter-field">
             <label class="filter-label" for="issuer_id">Filtrar por emisor</label>
-            <select id="issuer_id" name="issuer_id" onchange="this.form.submit()">
+            <select id="issuer_id" name="issuer_id">
                 <option value="">Todos los emisores</option>
                 {% for issuer in issuers %}
                 <option value="{{ issuer.id }}" {{ 'selected' if filter_issuer_id == issuer.id else '' }}>{{ issuer.rfc }} - {{ issuer.legal_name }}</option>
                 {% endfor %}
             </select>
         </div>
-        {% if filter_issuer_id %}
-        <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Limpiar filtro</a>
+        <div class="filter-field">
+            <label class="filter-label" for="q">Buscar</label>
+            <input id="q" type="search" name="q" value="{{ q }}" placeholder="Nombre, código o clave SAT">
+        </div>
+        <div class="filter-field">
+            <label class="filter-label" for="sort">Ordenar</label>
+            <select id="sort" name="sort">
+                <option value="name_asc" {{ 'selected' if sort == 'name_asc' else '' }}>Nombre A-Z</option>
+                <option value="name_desc" {{ 'selected' if sort == 'name_desc' else '' }}>Nombre Z-A</option>
+                <option value="newest" {{ 'selected' if sort == 'newest' else '' }}>Más recientes</option>
+                <option value="oldest" {{ 'selected' if sort == 'oldest' else '' }}>Más antiguos</option>
+                <option value="price_asc" {{ 'selected' if sort == 'price_asc' else '' }}>Precio menor</option>
+                <option value="price_desc" {{ 'selected' if sort == 'price_desc' else '' }}>Precio mayor</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Aplicar</button>
+        {% if filter_issuer_id or q or sort != 'name_asc' %}
+        <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary">Limpiar</a>
         {% endif %}
     </form>
 

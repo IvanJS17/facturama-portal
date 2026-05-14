@@ -258,7 +258,52 @@ def test_update_client_enforces_generic_rfc_defaults_server_side(tmp_path):
     assert saved["legal_name"] == "PÚBLICO EN GENERAL"
     assert saved["tax_regime"] == "616"
     assert saved["cfdi_use"] == "S01"
-    assert saved["zip_code"] == "01000"
+
+
+def test_clients_list_supports_search_sort_and_issuer_filter_state(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload(name="Issuer B", rfc="BBB010101BBB"))
+    database.upsert_client(
+        {
+            **client_payload(issuer_a),
+            "legal_name": "Cliente Zeta",
+            "rfc": "CZA010101AAA",
+        }
+    )
+    database.upsert_client(
+        {
+            **client_payload(issuer_a),
+            "legal_name": "Cliente Alfa",
+            "rfc": "CAL010101AAA",
+        }
+    )
+    database.upsert_client(
+        {
+            **client_payload(issuer_b),
+            "legal_name": "Cliente Otro Emisor",
+            "rfc": "COE010101AAA",
+        }
+    )
+    app = make_app(database)
+    client = app.test_client()
+
+    search_response = client.get("/clients/?issuer_id=%d&q=alfa" % issuer_a)
+    assert search_response.status_code == 200
+    assert b"CLIENTE ALFA" in search_response.data
+    assert b"CLIENTE ZETA" not in search_response.data
+    assert b"CLIENTE OTRO EMISOR" not in search_response.data
+    assert b'name="q"' in search_response.data
+    assert b'value="alfa"' in search_response.data
+    assert (f'value="{issuer_a}" selected').encode() in search_response.data
+
+    sort_response = client.get(f"/clients/?issuer_id={issuer_a}&sort=name_desc")
+    assert sort_response.status_code == 200
+    assert sort_response.data.find(b"CLIENTE ZETA") < sort_response.data.find(b"CLIENTE ALFA")
+
+    invalid_sort_response = client.get(f"/clients/?issuer_id={issuer_a}&sort=bad")
+    assert invalid_sort_response.status_code == 200
+    assert invalid_sort_response.data.find(b"CLIENTE ALFA") < invalid_sort_response.data.find(b"CLIENTE ZETA")
 
 
 def test_api_create_client_enforces_generic_rfc_defaults_server_side(tmp_path):

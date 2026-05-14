@@ -89,11 +89,15 @@ def _form_to_local(payload: dict, facturama_response: dict | None = None) -> dic
 @bp.get("/")
 def list_clients():
     issuer_filter = request.args.get("issuer_id", type=int)
+    q = (request.args.get("q") or "").strip()
+    sort = (request.args.get("sort") or "name_asc").strip()
     return render_template(
         "clients/list.html",
-        clients=db().list_clients(issuer_id=issuer_filter),
+        clients=db().list_clients(issuer_id=issuer_filter, q=q, sort=sort),
         issuers=db().list_issuers(),
         filter_issuer_id=issuer_filter,
+        q=q,
+        sort=sort,
     )
 
 
