@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Facturama Portal{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <div class="app-shell">
@@ -74,5 +75,6 @@
         });
     })();
     </script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

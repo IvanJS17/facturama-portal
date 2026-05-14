@@ -1,0 +1,145 @@
+/* SAT Catalog Search Component Styles */
+
+.sat-search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.sat-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--text-primary, #111827);
+    background-color: var(--bg-primary, #ffffff);
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.sat-search-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.sat-search-input::placeholder {
+    color: var(--text-secondary, #6b7280);
+}
+
+.sat-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: var(--bg-primary, #ffffff);
+    border: 1px solid var(--border-color, #d1d5db);
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.sat-search-item {
+    padding: 0.625rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--text-primary, #111827);
+    border-bottom: 1px solid var(--border-light, #f3f4f6);
+    transition: background-color 0.1s ease;
+}
+
+.sat-search-item:last-child {
+    border-bottom: none;
+}
+
+.sat-search-item:hover,
+.sat-search-item.selected {
+    background-color: var(--bg-hover, #f3f4f6);
+}
+
+.sat-search-item.selected {
+    background-color: var(--primary-light, #eff6ff);
+}
+
+.sat-search-item strong {
+    color: var(--primary-color, #3b82f6);
+    font-weight: 600;
+}
+
+.sat-search-no-results {
+    padding: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.875rem;
+    text-align: center;
+    font-style: italic;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .sat-search-input {
+        background-color: var(--bg-primary-dark, #1f2937);
+        border-color: var(--border-color-dark, #4b5563);
+        color: var(--text-primary-dark, #f9fafb);
+    }
+    
+    .sat-search-dropdown {
+        background-color: var(--bg-primary-dark, #1f2937);
+        border-color: var(--border-color-dark, #4b5563);
+    }
+    
+    .sat-search-item {
+        color: var(--text-primary-dark, #f9fafb);
+        border-color: var(--border-color-dark, #374151);
+    }
+    
+    .sat-search-item:hover,
+    .sat-search-item.selected {
+        background-color: var(--bg-hover-dark, #374151);
+    }
+    
+    .sat-search-item.selected {
+        background-color: var(--primary-light-dark, #1e3a5f);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .sat-search-dropdown {
+        max-height: 200px;
+    }
+    
+    .sat-search-item {
+        padding: 0.5rem 0.625rem;
+        font-size: 0.8125rem;
+    }
+}
+
+/* Animation */
+.sat-search-dropdown {
+    animation: sat-search-fade-in 0.15s ease-out;
+}
+
+@keyframes sat-search-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Selected value display */
+.sat-search-input[data-value] {
+    border-color: var(--success-color, #10b981);
+}
+
+.sat-search-input[data-value]:focus {
+    border-color: var(--success-color, #10b981);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}

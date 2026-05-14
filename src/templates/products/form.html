@@ -2,6 +2,10 @@
 
 {% block title %}{{ 'Editar' if product else 'Nuevo' }} Producto - Facturama Portal{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sat-search.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div>
@@ -39,18 +43,31 @@
             <h3>Clasificación SAT</h3>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="product_code">Código SAT (ProdServ)</label>
-                    <input type="text" id="product_code" name="product_code" value="{{ product.product_code if product else '01010101' }}" maxlength="8" placeholder="01010101">
+                    <label for="product_code">Código SAT (ProdServ) *</label>
+                    <input type="text" id="product_code" name="product_code" 
+                           value="{{ product.product_code if product else '01010101' }}" 
+                           maxlength="8" placeholder="Buscar código SAT..."
+                           data-sat-search="clave-prod-serv"
+                           data-placeholder="Buscar por código o descripción..."
+                           data-min-chars="2">
+                    <small class="form-help">Código de 8 dígitos del catálogo SAT de productos/servicios</small>
                 </div>
                 <div class="form-group">
-                    <label for="unit_code">Clave de unidad SAT</label>
-                    <input type="text" id="unit_code" name="unit_code" value="{{ product.unit_code if product else 'E48' }}" maxlength="3" placeholder="E48">
+                    <label for="unit_code">Clave de unidad SAT *</label>
+                    <input type="text" id="unit_code" name="unit_code" 
+                           value="{{ product.unit_code if product else 'E48' }}" 
+                           maxlength="3" placeholder="Buscar clave de unidad..."
+                           data-sat-search="clave-unidad"
+                           data-placeholder="Buscar por clave o nombre..."
+                           data-min-chars="1">
+                    <small class="form-help">Clave de unidad de medida (ej: E48 = Servicio, H87 = Pieza)</small>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label for="unit">Unidad de medida</label>
                     <input type="text" id="unit" name="unit" value="{{ product.unit if product else 'Servicio' }}" placeholder="Servicio">
+                    <small class="form-help">Se autocompleta al seleccionar la clave de unidad</small>
                 </div>
                 <div class="form-group">
                     <label for="tax_object">Objeto del impuesto</label>
@@ -73,4 +90,54 @@
         </div>
     </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/sat-search.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-populate unit name when unit_code is selected
+    const unitCodeInput = document.getElementById('unit_code');
+    const unitInput = document.getElementById('unit');
+    
+    if (unitCodeInput && unitInput) {
+        // Create SATSearchSelect instance for unit_code
+        const unitSearch = new SATSearchSelect(unitCodeInput, {
+            apiUrl: '/api/sat/clave-unidad/search',
+            placeholder: 'Buscar por clave o nombre...',
+            minChars: 1,
+            displayField: 'name',
+            valueField: 'code',
+            formatResult: function(result) {
+                const code = result.code || '';
+                const name = result.name || '';
+                const symbol = result.symbol ? ` (${result.symbol})` : '';
+                return `<strong>${escapeHtml(code)}</strong> - ${escapeHtml(name)}${symbol}`;
+            },
+            onSelect: function(result) {
+                // Auto-populate the unit name field
+                unitInput.value = result.name || '';
+            }
+        });
+    }
+    
+    // Product code search
+    const productCodeInput = document.getElementById('product_code');
+    if (productCodeInput) {
+        new SATSearchSelect(productCodeInput, {
+            apiUrl: '/api/sat/clave-prod-serv/search',
+            placeholder: 'Buscar por código o descripción...',
+            minChars: 2,
+            displayField: 'description',
+            valueField: 'code'
+        });
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>
 {% endblock %}

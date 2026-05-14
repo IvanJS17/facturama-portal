@@ -170,6 +170,7 @@ class PortalDatabase:
                 self._ensure_invoice_series(conn)
                 self._ensure_issuer_csd(conn)
                 self._ensure_client_products(conn)
+                self._ensure_sat_catalogs(conn)
                 self._ensure_timestamps(conn, "invoice_series", ("created_at", "updated_at"))
                 self._ensure_timestamps(conn, "cfdi_items", ("created_at",))
             finally:
@@ -471,6 +472,175 @@ class PortalDatabase:
             ON client_products(issuer_id, product_id);
             """
         )
+
+    def _ensure_sat_catalogs(self, conn: sqlite3.Connection) -> None:
+        """Create SAT catalog tables if they don't exist."""
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS sat_clave_prod_serv (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL,
+                incluir_iva TEXT,
+                incluir_ieps TEXT,
+                complemento TEXT,
+                fecha_inicio TEXT,
+                fecha_fin TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sat_clave_prod_serv_code
+            ON sat_clave_prod_serv(code);
+
+            CREATE TABLE IF NOT EXISTS sat_clave_unidad (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                description TEXT,
+                symbol TEXT,
+                fecha_inicio TEXT,
+                fecha_fin TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sat_clave_unidad_code
+            ON sat_clave_unidad(code);
+
+            CREATE TABLE IF NOT EXISTS sat_regimen_fiscal (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL,
+                aplica_fisica INTEGER NOT NULL DEFAULT 0,
+                aplica_moral INTEGER NOT NULL DEFAULT 0,
+                fecha_inicio TEXT,
+                fecha_fin TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sat_regimen_fiscal_code
+            ON sat_regimen_fiscal(code);
+
+            CREATE TABLE IF NOT EXISTS sat_forma_pago (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL,
+                bancarizado INTEGER NOT NULL DEFAULT 0,
+                fecha_inicio TEXT,
+                fecha_fin TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sat_forma_pago_code
+            ON sat_forma_pago(code);
+
+            CREATE TABLE IF NOT EXISTS sat_metodo_pago (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL,
+                fecha_inicio TEXT,
+                fecha_fin TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_sat_metodo_pago_code
+            ON sat_metodo_pago(code);
+            """
+        )
+
+    def search_sat_clave_prod_serv(self, query: str, limit: int = 20) -> list[sqlite3.Row]:
+        """Search SAT product/service codes by code or description."""
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT code, description
+                FROM sat_clave_prod_serv
+                WHERE code LIKE ? OR description LIKE ?
+                ORDER BY
+                    CASE WHEN code = ? THEN 0
+                         WHEN code LIKE ? THEN 1
+                         ELSE 2
+                    END,
+                    code
+                LIMIT ?
+                """,
+                (f"%{query}%", f"%{query}%", query, f"{query}%", limit),
+            ).fetchall()
+
+    def search_sat_clave_unidad(self, query: str, limit: int = 20) -> list[sqlite3.Row]:
+        """Search SAT unit codes by code, name, or symbol."""
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT code, name, symbol
+                FROM sat_clave_unidad
+                WHERE code LIKE ? OR name LIKE ? OR symbol LIKE ?
+                ORDER BY
+                    CASE WHEN code = ? THEN 0
+                         WHEN code LIKE ? THEN 1
+                         ELSE 2
+                    END,
+                    code
+                LIMIT ?
+                """,
+                (f"%{query}%", f"%{query}%", f"%{query}%", query, f"{query}%", limit),
+            ).fetchall()
+
+    def search_sat_regimen_fiscal(self, query: str, person_type: str = None, limit: int = 20) -> list[sqlite3.Row]:
+        """Search SAT tax regimes by code or description."""
+        with self.connect() as conn:
+            if person_type == 'fisica':
+                return conn.execute(
+                    """
+                    SELECT code, description, aplica_fisica, aplica_moral
+                    FROM sat_regimen_fiscal
+                    WHERE aplica_fisica = 1
+                      AND (code LIKE ? OR description LIKE ?)
+                    ORDER BY code
+                    LIMIT ?
+                    """,
+                    (f"%{query}%", f"%{query}%", limit),
+                ).fetchall()
+            elif person_type == 'moral':
+                return conn.execute(
+                    """
+                    SELECT code, description, aplica_fisica, aplica_moral
+                    FROM sat_regimen_fiscal
+                    WHERE aplica_moral = 1
+                      AND (code LIKE ? OR description LIKE ?)
+                    ORDER BY code
+                    LIMIT ?
+                    """,
+                    (f"%{query}%", f"%{query}%", limit),
+                ).fetchall()
+            else:
+                return conn.execute(
+                    """
+                    SELECT code, description, aplica_fisica, aplica_moral
+                    FROM sat_regimen_fiscal
+                    WHERE code LIKE ? OR description LIKE ?
+                    ORDER BY code
+                    LIMIT ?
+                    """,
+                    (f"%{query}%", f"%{query}%", limit),
+                ).fetchall()
+
+    def search_sat_forma_pago(self, query: str, limit: int = 20) -> list[sqlite3.Row]:
+        """Search SAT payment forms by code or description."""
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT code, description
+                FROM sat_forma_pago
+                WHERE code LIKE ? OR description LIKE ?
+                ORDER BY code
+                LIMIT ?
+                """,
+                (f"%{query}%", f"%{query}%", limit),
+            ).fetchall()
+
+    def search_sat_metodo_pago(self, query: str, limit: int = 20) -> list[sqlite3.Row]:
+        """Search SAT payment methods by code or description."""
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT code, description
+                FROM sat_metodo_pago
+                WHERE code LIKE ? OR description LIKE ?
+                ORDER BY code
+                LIMIT ?
+                """,
+                (f"%{query}%", f"%{query}%", limit),
+            ).fetchall()
 
     def list_series(self, issuer_id: int) -> list[sqlite3.Row]:
         with self.connect() as conn:

@@ -25,7 +25,7 @@ def create_app() -> Flask:
     database.init_schema()
     app.extensions["portal_db"] = database
 
-    from src.routes import cfdi, clients, dashboard, issuers, products, reports
+    from src.routes import cfdi, clients, dashboard, issuers, products, reports, sat
 
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(cfdi.bp)
@@ -38,6 +38,7 @@ def create_app() -> Flask:
     app.register_blueprint(products.api_bp)
     app.register_blueprint(reports.bp)
     app.register_blueprint(reports.api_bp)
+    app.register_blueprint(sat.bp)
 
     @app.before_request
     def require_authentication():
