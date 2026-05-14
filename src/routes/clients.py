@@ -40,6 +40,20 @@ def _parse_product_ids(payload) -> list[int]:
     return parsed
 
 
+def _validate_selected_products_for_issuer(issuer_id: int, product_ids: list[int]) -> None:
+    selected_ids = {int(pid) for pid in product_ids if int(pid) > 0}
+    if not selected_ids:
+        return
+    allowed_ids = {int(row["id"]) for row in db().list_products(issuer_id=issuer_id)}
+    invalid_ids = [product_id for product_id in selected_ids if product_id not in allowed_ids]
+    if not invalid_ids:
+        return
+    first_invalid = invalid_ids[0]
+    if db().get_product(first_invalid) is None:
+        raise ValueError("Selected product does not exist")
+    raise ValueError("Selected product does not belong to selected issuer")
+
+
 def _enforce_generic_rfc_defaults(payload: dict) -> dict:
     """Apply server-side generic receptor defaults for RFC XAXX010101000."""
     issuer_id = _require_existing_issuer(payload)
@@ -103,12 +117,14 @@ def new_client():
 def create_client():
     payload = request.form.to_dict()
     payload = _enforce_generic_rfc_defaults(payload)
-    facturama_response = {}
-    if request.form.get("sync_facturama"):
-        facturama_response = api().create_client(build_client_payload(payload))
+    product_ids = _parse_product_ids(request.form)
     try:
+        _validate_selected_products_for_issuer(int(payload["issuer_id"]), product_ids)
+        facturama_response = {}
+        if request.form.get("sync_facturama"):
+            facturama_response = api().create_client(build_client_payload(payload))
         client_id = db().upsert_client(_form_to_local(payload, facturama_response))
-        db().set_client_products(client_id, _parse_product_ids(request.form))
+        db().set_client_products(client_id, product_ids)
     except ValueError as exc:
         return flash_and_redirect(
             f"Error de validacion fiscal: {exc}",
@@ -138,13 +154,15 @@ def edit_client(client_id: int):
 def update_client(client_id: int):
     payload = request.form.to_dict()
     payload = _enforce_generic_rfc_defaults(payload)
+    product_ids = _parse_product_ids(request.form)
     existing = row_or_404(db().get_client(client_id), "Client not found")
-    facturama_response = {}
-    if request.form.get("sync_facturama") and existing.get("facturama_id"):
-        facturama_response = api().update_client(existing["facturama_id"], build_client_payload(payload))
     try:
+        _validate_selected_products_for_issuer(int(payload["issuer_id"]), product_ids)
+        facturama_response = {}
+        if request.form.get("sync_facturama") and existing.get("facturama_id"):
+            facturama_response = api().update_client(existing["facturama_id"], build_client_payload(payload))
         db().upsert_client(_form_to_local(payload, facturama_response), client_id)
-        db().set_client_products(client_id, _parse_product_ids(request.form))
+        db().set_client_products(client_id, product_ids)
     except ValueError as exc:
         return flash_and_redirect(
             f"Error de validacion fiscal: {exc}",

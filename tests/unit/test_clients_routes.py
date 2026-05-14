@@ -337,6 +337,24 @@ def test_create_client_persists_selected_product_associations(tmp_path):
     assert [row["id"] for row in linked] == [product_1, product_2]
 
 
+def test_create_client_rejects_cross_issuer_product_association_without_persisting_client(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload(name="Issuer B", rfc="BBB010101BBB"))
+    product_b = database.upsert_product(product_payload(issuer_b, name="Servicio B", sku="B-1"))
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/clients/",
+        data={**client_payload(issuer_a), "product_ids": [str(product_b)]},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"selected issuer" in response.data
+    assert database.list_clients(issuer_id=issuer_a) == []
+
+
 def test_edit_client_form_shows_current_issuer_products_and_selected_associations(tmp_path):
     database = make_db(tmp_path)
     issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
@@ -363,15 +381,26 @@ def test_update_client_rejects_cross_issuer_product_association(tmp_path):
     product_a = database.upsert_product(product_payload(issuer_a, name="Servicio A", sku="A-1"))
     product_b = database.upsert_product(product_payload(issuer_b, name="Servicio B", sku="B-1"))
     database.set_client_products(client_id, [product_a])
+    before = database.get_client(client_id)
+    assert before is not None
     app = make_app(database)
 
     response = app.test_client().post(
         f"/clients/{client_id}",
-        data={**client_payload(issuer_a), "product_ids": [str(product_b)]},
+        data={
+            **client_payload(issuer_a),
+            "legal_name": "Mutated Name",
+            "email": "mutated@example.com",
+            "product_ids": [str(product_b)],
+        },
         follow_redirects=True,
     )
 
     assert response.status_code == 200
     assert b"selected issuer" in response.data
+    client = database.get_client(client_id)
+    assert client is not None
+    assert client["legal_name"] == before["legal_name"]
+    assert client["email"] == before["email"]
     linked = database.list_client_products(client_id)
     assert [row["id"] for row in linked] == [product_a]
