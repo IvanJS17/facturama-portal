@@ -566,6 +566,32 @@ class PortalDatabase:
                 (issuer_id,),
             ).fetchone()
 
+    def list_expiring_issuer_csds(self, reference_date: str, window_days: int = 90) -> list[sqlite3.Row]:
+        safe_window_days = max(int(window_days), 0)
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT
+                    c.id,
+                    c.issuer_id,
+                    i.legal_name AS issuer_name,
+                    i.rfc AS issuer_rfc,
+                    c.rfc,
+                    c.certificate_number,
+                    c.certificate_subject,
+                    c.certificate_valid_from,
+                    c.certificate_valid_to,
+                    CAST(julianday(date(c.certificate_valid_to)) - julianday(date(?)) AS INTEGER) AS days_to_expiration
+                FROM issuer_csd c
+                INNER JOIN issuers i ON i.id = c.issuer_id
+                WHERE c.active = 1
+                  AND c.certificate_valid_to <> ''
+                  AND CAST(julianday(date(c.certificate_valid_to)) - julianday(date(?)) AS INTEGER) <= ?
+                ORDER BY days_to_expiration ASC, c.id DESC
+                """,
+                (reference_date, reference_date, safe_window_days),
+            ).fetchall()
+
     def get_next_folio(self, issuer_id: int, series: str) -> int:
         cleaned_series = (series or "FAC").strip().upper()
         if not cleaned_series:

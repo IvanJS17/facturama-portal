@@ -257,3 +257,89 @@ def test_dashboard_folio_abbreviation(tmp_path):
     assert response.status_code == 200
     # folio=1234 -> '...1234' in the HTML
     assert b"...1234" in response.data
+
+
+def test_dashboard_renders_csd_expiration_alerts_with_severity_and_edit_link(tmp_path):
+    database = make_db(tmp_path)
+    issuer_expired = database.save_issuer(issuer_payload("Issuer Expired", "EXP010101AAA"))
+    issuer_soon = database.save_issuer(issuer_payload("Issuer Soon", "SOO010101AAA"))
+    issuer_mid = database.save_issuer(issuer_payload("Issuer Mid", "MID010101AAA"))
+    issuer_late = database.save_issuer(issuer_payload("Issuer Late", "LAT010101AAA"))
+
+    database.save_issuer_csd_metadata(
+        issuer_expired,
+        {
+            "rfc": "EXP010101AAA",
+            "serial": "EXP-1",
+            "subject": "CN=Expired",
+            "valid_from": "2025-01-01T00:00:00+00:00",
+            "valid_to": "2026-05-10T00:00:00+00:00",
+        },
+    )
+    database.save_issuer_csd_metadata(
+        issuer_soon,
+        {
+            "rfc": "SOO010101AAA",
+            "serial": "SOON-1",
+            "subject": "CN=Soon",
+            "valid_from": "2025-01-01T00:00:00+00:00",
+            "valid_to": "2026-05-30T00:00:00+00:00",
+        },
+    )
+    database.save_issuer_csd_metadata(
+        issuer_mid,
+        {
+            "rfc": "MID010101AAA",
+            "serial": "MID-1",
+            "subject": "CN=Mid",
+            "valid_from": "2025-01-01T00:00:00+00:00",
+            "valid_to": "2026-07-10T00:00:00+00:00",
+        },
+    )
+    database.save_issuer_csd_metadata(
+        issuer_late,
+        {
+            "rfc": "LAT010101AAA",
+            "serial": "LAT-1",
+            "subject": "CN=Late",
+            "valid_from": "2025-01-01T00:00:00+00:00",
+            "valid_to": "2026-08-10T00:00:00+00:00",
+        },
+    )
+    app = make_app(database)
+    app.config["CSD_ALERT_REFERENCE_DATE"] = "2026-05-14"
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    assert "Sellos CSD próximos a vencer".encode() in response.data
+    assert b"Vencido" in response.data
+    assert "0-30 días".encode() in response.data
+    assert "31-60 días".encode() in response.data
+    assert "61-90 días".encode() in response.data
+    assert b"/issuers/" in response.data
+    assert b"/edit" in response.data
+
+
+def test_dashboard_uses_configurable_csd_window_days(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))
+    database.save_issuer_csd_metadata(
+        issuer_id,
+        {
+            "rfc": "AAA010101AAA",
+            "serial": "A-1",
+            "subject": "CN=A",
+            "valid_from": "2025-01-01T00:00:00+00:00",
+            "valid_to": "2026-07-10T00:00:00+00:00",
+        },
+    )
+    app = make_app(database)
+    app.config["CSD_ALERT_REFERENCE_DATE"] = "2026-05-14"
+    app.config["CSD_EXPIRATION_ALERT_DAYS"] = 30
+
+    response = app.test_client().get("/")
+
+    assert response.status_code == 200
+    assert b"A-1" not in response.data
+    assert "No hay CSD vencidos o próximos a vencer en esta ventana.".encode() in response.data

@@ -11,10 +11,68 @@
     <a href="{{ url_for('cfdi.new_cfdi') }}" class="btn btn-primary">Nueva Factura</a>
 </div>
 
+<div class="card dashboard-csd-card">
+    <h2>Sellos CSD próximos a vencer</h2>
+    {% set critical_csds = expiring_csds|selectattr('days_to_expiration', 'le', 30)|list %}
+    {% if critical_csds %}
+    <div class="alert alert-error dashboard-csd-banner" id="csd-critical-banner">
+        <strong>Atención:</strong> hay {{ critical_csds|length }} sello(s) CSD vencido(s) o por vencer en <= 30 días.
+        <button type="button" class="btn btn-sm btn-secondary" id="dismiss-csd-banner">Cerrar</button>
+    </div>
+    {% endif %}
+    {% if expiring_csds %}
+    <div class="table-wrap dashboard-table-wrap">
+        <table>
+            <thead><tr><th>Estado</th><th>Días</th><th>RFC</th><th>Emisor</th><th>Certificado</th><th>Vence</th><th></th></tr></thead>
+            <tbody>
+            {% for csd in expiring_csds %}
+                <tr>
+                    <td>
+                        {% if csd.severity == 'expired' %}
+                            <span class="badge badge-canceled">Vencido</span>
+                        {% elif csd.severity == '0-30' %}
+                            <span class="badge badge-pending">0-30 días</span>
+                        {% elif csd.severity == '31-60' %}
+                            <span class="badge badge-soft">31-60 días</span>
+                        {% else %}
+                            <span class="badge badge-active">61-90 días</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ csd.days_to_expiration }}</td>
+                    <td>{{ csd.issuer_rfc }}</td>
+                    <td>{{ csd.issuer_name }}</td>
+                    <td>{{ csd.certificate_number or '-' }}</td>
+                    <td>{{ csd.certificate_valid_to[:10] if csd.certificate_valid_to else '-' }}</td>
+                    <td><a href="{{ url_for('issuers.edit_issuer', issuer_id=csd.issuer_id) }}" class="btn btn-sm btn-secondary">Editar emisor</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No hay CSD vencidos o próximos a vencer en esta ventana.</p>
+    </div>
+    {% endif %}
+</div>
+
 <div class="card dashboard-hero card-muted">
     <p class="step-chip">Resumen operativo</p>
     <p class="page-subtitle">Accede rápido a tus emisores, clientes, catálogo y facturación reciente.</p>
 </div>
+
+{% if critical_csds %}
+<script>
+(() => {
+    const banner = document.getElementById("csd-critical-banner");
+    const dismiss = document.getElementById("dismiss-csd-banner");
+    if (!banner || !dismiss) return;
+    dismiss.addEventListener("click", () => {
+        banner.style.display = "none";
+    });
+})();
+</script>
+{% endif %}
 
 <div class="stats-grid">
     <div class="stat-card primary">
