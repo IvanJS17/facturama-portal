@@ -399,6 +399,85 @@ def test_create_issuer_with_csd_missing_required_non_csd_fields_fails_without_pe
     assert database.list_issuers() == []
 
 
+def test_create_issuer_with_csd_upload_failure_rolls_back_insert(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    app = make_app(database)
+
+    monkeypatch.setattr(
+        issuer_routes,
+        "parse_csd_certificate",
+        lambda data: {
+            "rfc": "AAA010101AAA",
+            "serial": "ABC123",
+            "subject": "CN=Acme",
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_to": "2027-01-01T00:00:00+00:00",
+        },
+    )
+    monkeypatch.setattr(issuer_routes, "api", lambda: FakeFacturamaAPI(fail=True))
+
+    response = app.test_client().post(
+        "/issuers/",
+        data={
+            "legal_name": "Acme",
+            "rfc": "AAA010101AAA",
+            "tax_regime": "601",
+            "zip_code": "01000",
+            "email": "conta@example.com",
+            "csd_password": "secret",
+            "certificate_file": (BytesIO(b"fake-cer"), "cert.cer"),
+            "private_key_file": (BytesIO(b"fake-key"), "key.key"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"No se pudo subir el CSD a Facturama" in response.data
+    assert database.list_issuers() == []
+
+
+def test_bulk_csd_onboarding_reports_incomplete_rows_not_silently_skipped(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    app = make_app(database)
+
+    monkeypatch.setattr(
+        issuer_routes,
+        "parse_csd_certificate",
+        lambda data: {
+            "rfc": "AAA010101AAA",
+            "serial": "SER-1",
+            "subject": "CN=Uno",
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_to": "2027-01-01T00:00:00+00:00",
+        },
+    )
+    monkeypatch.setattr(issuer_routes, "api", lambda: FakeFacturamaAPI())
+
+    response = app.test_client().post(
+        "/issuers/bulk-csd",
+        data={
+            "default_tax_regime": "601",
+            "default_zip_code": "01000",
+            "default_email": "conta@example.com",
+            "certificate_file_1": (BytesIO(b"cer-1"), "a.cer"),
+            "private_key_file_1": (BytesIO(b"key-1"), "a.key"),
+            "csd_password_1": "s1",
+            "private_key_file_2": (BytesIO(b"key-2"), "b.key"),
+            "csd_password_2": "s2",
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Fila 1: OK" in response.data
+    assert b"Fila 2: ERROR" in response.data
+    assert b"Procesadas 2 filas" in response.data
+    issuers = database.list_issuers()
+    assert len(issuers) == 1
+
+
 def test_bulk_csd_onboarding_creates_multiple_issuers_and_reports_per_row_success(tmp_path, monkeypatch):
     database = make_db(tmp_path)
     app = make_app(database)

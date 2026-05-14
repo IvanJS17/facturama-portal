@@ -252,13 +252,15 @@ def bulk_csd_onboarding():
 def bulk_csd_onboarding_submit():
     row_results = []
     created_count = 0
-    indexes = sorted(
-        {
-            int(key.removeprefix("certificate_file_"))
-            for key in request.files.keys()
-            if key.startswith("certificate_file_") and key.removeprefix("certificate_file_").isdigit()
-        }
-    )
+    row_indexes: set[int] = set()
+    for key in request.files.keys():
+        for prefix in ("certificate_file_", "private_key_file_"):
+            if key.startswith(prefix) and key.removeprefix(prefix).isdigit():
+                row_indexes.add(int(key.removeprefix(prefix)))
+    for key in request.form.keys():
+        if key.startswith("csd_password_") and key.removeprefix("csd_password_").isdigit():
+            row_indexes.add(int(key.removeprefix("csd_password_")))
+    indexes = sorted(row_indexes)
     default_tax_regime = (request.form.get("default_tax_regime") or "").strip()
     default_zip_code = (request.form.get("default_zip_code") or "").strip()
     default_email = (request.form.get("default_email") or "").strip()
