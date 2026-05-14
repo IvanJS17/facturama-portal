@@ -12,6 +12,9 @@
 </div>
 
 <div class="card">
+    {% if selected_issuer %}
+    <p class="muted-note">Filtrando por emisor: <strong>{{ selected_issuer.rfc }} - {{ selected_issuer.legal_name }}</strong></p>
+    {% endif %}
     <form method="get" class="filter-bar">
         <div class="filter-field">
             <label class="filter-label" for="issuer_id">Emisor</label>
@@ -24,7 +27,7 @@
         </div>
         <div class="filter-field">
             <label class="filter-label" for="q">Buscar</label>
-            <input id="q" type="search" name="q" value="{{ q }}" placeholder="Cliente o folio">
+            <input id="q" type="search" name="q" value="{{ q }}" placeholder="UUID, folio, serie, cliente, RFC o estado">
         </div>
         <div class="filter-field">
             <label class="filter-label" for="recipient_rfc">RFC receptor</label>
@@ -93,7 +96,7 @@
     </div>
     {% else %}
     <div class="empty-state">
-        {% if recipient_rfc or status %}
+        {% if recipient_rfc or status or q or issuer_id %}
         <p>No hay CFDIs que coincidan con los filtros.</p>
         {% else %}
         <p>No hay CFDIs registrados.</p>

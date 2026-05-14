@@ -1059,9 +1059,19 @@ class PortalDatabase:
         if search:
             like = f"%{search.upper()}%"
             where_clauses.append(
-                "(UPPER(COALESCE(c.recipient_name, '')) LIKE ? OR UPPER(COALESCE(cl.legal_name, '')) LIKE ? OR UPPER(COALESCE(c.facturama_id, '')) LIKE ?)"
+                "("
+                "UPPER(COALESCE(c.recipient_name, '')) LIKE ? "
+                "OR UPPER(COALESCE(cl.legal_name, '')) LIKE ? "
+                "OR UPPER(COALESCE(c.facturama_id, '')) LIKE ? "
+                "OR UPPER(COALESCE(c.uuid, '')) LIKE ? "
+                "OR UPPER(COALESCE(c.serie, '')) LIKE ? "
+                "OR CAST(COALESCE(c.folio, 0) AS TEXT) LIKE ? "
+                "OR UPPER(COALESCE(c.recipient_rfc, '')) LIKE ? "
+                "OR UPPER(COALESCE(cl.rfc, '')) LIKE ? "
+                "OR UPPER(COALESCE(c.status, '')) LIKE ?"
+                ")"
             )
-            params.extend([like, like, like])
+            params.extend([like, like, like, like, like, f"%{search}%", like, like, like])
         if date_from.strip():
             where_clauses.append("DATE(c.created_at) >= DATE(?)")
             params.append(date_from.strip())

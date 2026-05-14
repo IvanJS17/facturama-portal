@@ -259,3 +259,79 @@ def test_cfdi_list_supports_search_status_issuer_sort_and_safe_invalid_sort(tmp_
 
     invalid_sort_response = client.get(f"/cfdi/?issuer_id={issuer_a}&sort=bad")
     assert invalid_sort_response.status_code == 200
+
+
+def test_cfdi_list_search_within_issuer_by_uuid_folio_and_client_rfc(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    issuer_a, issuer_b, client_a, client_b, _, _ = seed_two_issuers(database)
+    database.save_cfdi(
+        {
+            "facturama_id": "remote-a-uuid-001",
+            "uuid": "UUID-A-12345",
+            "issuer_id": issuer_a,
+            "client_id": client_a,
+            "recipient_rfc": "ACA010101ABC",
+            "recipient_name": "Cliente Alfa",
+            "serie": "FAC",
+            "folio": 55,
+            "status": "active",
+            "total": 100,
+        }
+    )
+    database.save_cfdi(
+        {
+            "facturama_id": "remote-b-uuid-001",
+            "uuid": "UUID-B-54321",
+            "issuer_id": issuer_b,
+            "client_id": client_b,
+            "recipient_rfc": "ACB010101ABC",
+            "recipient_name": "Cliente Externo",
+            "serie": "FAC",
+            "folio": 55,
+            "status": "active",
+            "total": 120,
+        }
+    )
+    fake_api = FakeCfdiAPI(database)
+    app = make_app(database, fake_api, monkeypatch)
+    client = app.test_client()
+
+    by_uuid = client.get(f"/cfdi/?issuer_id={issuer_a}&q=UUID-A-12345")
+    assert by_uuid.status_code == 200
+    assert b"ACME A" in by_uuid.data
+    assert b"Acme B" not in by_uuid.data
+
+    by_folio = client.get(f"/cfdi/?issuer_id={issuer_a}&q=55")
+    assert by_folio.status_code == 200
+    assert b"ACME A" in by_folio.data
+    assert b"Acme B" not in by_folio.data
+
+    by_client_rfc = client.get(f"/cfdi/?issuer_id={issuer_a}&q=ACA010101ABC")
+    assert by_client_rfc.status_code == 200
+    assert b"ACME A" in by_client_rfc.data
+    assert b"Acme B" not in by_client_rfc.data
+
+
+def test_cfdi_list_invalid_issuer_and_invalid_query_params_do_not_500(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    issuer_a, _, client_a, _, _, _ = seed_two_issuers(database)
+    database.save_cfdi(
+        {
+            "facturama_id": "cfdi-a",
+            "issuer_id": issuer_a,
+            "client_id": client_a,
+            "recipient_rfc": "ACA010101ABC",
+            "recipient_name": "Cliente A",
+            "status": "active",
+            "total": 100,
+        }
+    )
+    fake_api = FakeCfdiAPI(database)
+    app = make_app(database, fake_api, monkeypatch)
+    client = app.test_client()
+
+    invalid_issuer = client.get("/cfdi/?issuer_id=abc&q=test&sort=drop")
+    assert invalid_issuer.status_code == 200
+
+    unknown_issuer = client.get("/cfdi/?issuer_id=999999&q=test&sort=drop")
+    assert unknown_issuer.status_code == 200

@@ -74,6 +74,7 @@ def edit_issuer(issuer_id: int):
             "products.new_product" in current_app.view_functions
             and "products.edit_product" in current_app.view_functions
         ),
+        has_cfdi_routes="cfdi.list_cfdis" in current_app.view_functions,
         latest_csd=db().get_latest_issuer_csd(issuer_id),
     )
 

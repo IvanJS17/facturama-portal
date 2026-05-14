@@ -199,6 +199,7 @@ def test_issuer_edit_renders_issuer_products_and_add_product_link(tmp_path):
     assert b"Servicio B" not in response.data
     assert f"/products/new?issuer_id={issuer_a}".encode() in response.data
     assert f"/products/{product_a}/edit".encode() in response.data
+    assert f"/cfdi/?issuer_id={issuer_a}".encode() in response.data
 
 
 def test_issuers_list_search_and_sort_and_invalid_sort_fallback(tmp_path):

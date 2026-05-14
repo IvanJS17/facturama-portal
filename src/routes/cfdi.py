@@ -86,6 +86,7 @@ def list_cfdis():
     sort = (request.args.get("sort") or "newest").strip()
     date_from = (request.args.get("date_from") or "").strip()
     date_to = (request.args.get("date_to") or "").strip()
+    selected_issuer = db().get_issuer(issuer_id) if issuer_id is not None else None
     return render_template(
         "cfdis/list.html",
         cfdis=db().list_cfdis(
@@ -105,6 +106,7 @@ def list_cfdis():
         sort=sort,
         date_from=date_from,
         date_to=date_to,
+        selected_issuer=selected_issuer,
     )
 
 
