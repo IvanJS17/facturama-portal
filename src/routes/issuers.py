@@ -31,24 +31,116 @@ def _read_limited_upload(file_storage, max_bytes: int) -> bytes:
     return uploaded
 
 
+def _extract_csd_payload_from_request():
+    certificate_file = request.files.get("certificate_file")
+    private_key_file = request.files.get("private_key_file")
+    private_key_password = request.form.get("csd_password", "").strip()
+
+    has_any_csd_input = bool(
+        certificate_file
+        or private_key_file
+        or private_key_password
+    )
+    if not has_any_csd_input:
+        return None
+
+    if not certificate_file or not private_key_file or not private_key_password:
+        raise ValueError("Debes adjuntar .cer, .key y password del CSD.")
+    if not _has_extension(certificate_file.filename, ".cer"):
+        raise ValueError("El certificado debe tener extension .cer.")
+    if not _has_extension(private_key_file.filename, ".key"):
+        raise ValueError("La llave privada debe tener extension .key.")
+
+    certificate_bytes = _read_limited_upload(certificate_file, CSD_UPLOAD_MAX_FILE_BYTES)
+    private_key_bytes = _read_limited_upload(private_key_file, CSD_UPLOAD_MAX_FILE_BYTES)
+    if not certificate_bytes or not private_key_bytes:
+        raise ValueError("Los archivos CSD no pueden estar vacios.")
+
+    cert_metadata = parse_csd_certificate(certificate_bytes)
+    cert_rfc = str(cert_metadata.get("rfc", "")).strip().upper()
+    if not cert_rfc:
+        raise ValueError("No se pudo obtener RFC del certificado .cer.")
+
+    return {
+        "cert_metadata": cert_metadata,
+        "cert_rfc": cert_rfc,
+        "certificate_bytes": certificate_bytes,
+        "private_key_bytes": private_key_bytes,
+        "private_key_password": private_key_password,
+    }
+
+
+def _upload_csd_and_persist_metadata(issuer_id: int, csd_payload: dict) -> tuple[str, str]:
+    certificate_b64 = base64.b64encode(csd_payload["certificate_bytes"]).decode("ascii")
+    private_key_b64 = base64.b64encode(csd_payload["private_key_bytes"]).decode("ascii")
+    try:
+        api().upload_csd(certificate_b64, private_key_b64, csd_payload["private_key_password"])
+    except ValueError:
+        db().save_issuer_csd_metadata(issuer_id, csd_payload["cert_metadata"])
+        return ("info", "El CSD ya existia en Facturama; se actualizo metadata local.")
+    except FacturamaAPIError as exc:
+        raise ValueError("No se pudo subir el CSD a Facturama. Intenta nuevamente.") from exc
+
+    db().save_issuer_csd_metadata(issuer_id, csd_payload["cert_metadata"])
+    return ("success", "Sello CSD actualizado.")
+
+
 @bp.get("/")
 def list_issuers():
     q = (request.args.get("q") or "").strip()
     sort = (request.args.get("sort") or "name_asc").strip()
-    return render_template("issuers/list.html", issuers=db().list_issuers(q=q, sort=sort), q=q, sort=sort)
+    return render_template(
+        "issuers/list.html",
+        issuers=db().list_issuers(q=q, sort=sort),
+        q=q,
+        sort=sort,
+        has_clients_routes=(
+            "clients.list_clients" in current_app.view_functions
+            and "clients.new_client" in current_app.view_functions
+        ),
+        has_bulk_csd_route="issuers.bulk_csd_onboarding" in current_app.view_functions,
+    )
 
 
 @bp.get("/new")
 def new_issuer():
-    return render_template("issuers/form.html", issuer=None, series_list=[])
+    return render_template(
+        "issuers/form.html",
+        issuer=None,
+        series_list=[],
+        has_clients_routes=(
+            "clients.list_clients" in current_app.view_functions
+            and "clients.new_client" in current_app.view_functions
+        ),
+        has_bulk_csd_route="issuers.bulk_csd_onboarding" in current_app.view_functions,
+    )
 
 
 @bp.post("/")
 def create_issuer():
+    payload = request.form.to_dict()
+    csd_payload = None
     try:
-        issuer_id = db().save_issuer(request.form.to_dict())
-    except ValueError as exc:
+        csd_payload = _extract_csd_payload_from_request()
+    except (ValueError, CSDParserError) as exc:
         return flash_and_redirect(f"Error de validacion fiscal: {exc}", "issuers.new_issuer", category="error")
+
+    if csd_payload:
+        payload["rfc"] = csd_payload["cert_rfc"]
+        payload["legal_name"] = str(csd_payload["cert_metadata"].get("subject", "")).strip() or payload.get(
+            "legal_name",
+            "",
+        )
+    try:
+        issuer_id = db().save_issuer(payload)
+    except (ValueError, KeyError) as exc:
+        return flash_and_redirect(f"Error de validacion fiscal: {exc}", "issuers.new_issuer", category="error")
+    if csd_payload:
+        try:
+            _upload_csd_and_persist_metadata(issuer_id, csd_payload)
+        except ValueError as exc:
+            db().delete_issuer(issuer_id)
+            return flash_and_redirect(str(exc), "issuers.new_issuer", category="error")
     return flash_and_redirect("Emisor guardado.", "issuers.edit_issuer", issuer_id=issuer_id)
 
 
@@ -76,6 +168,11 @@ def edit_issuer(issuer_id: int):
         ),
         has_cfdi_routes="cfdi.list_cfdis" in current_app.view_functions,
         latest_csd=db().get_latest_issuer_csd(issuer_id),
+        has_clients_routes=(
+            "clients.list_clients" in current_app.view_functions
+            and "clients.new_client" in current_app.view_functions
+        ),
+        has_bulk_csd_route="issuers.bulk_csd_onboarding" in current_app.view_functions,
     )
 
 
@@ -117,11 +214,11 @@ def create_series(issuer_id: int):
 @bp.post("/<int:issuer_id>/csd")
 def upload_issuer_csd(issuer_id: int):
     issuer = row_or_404(db().get_issuer(issuer_id), "Issuer not found")
-    certificate_file = request.files.get("certificate_file")
-    private_key_file = request.files.get("private_key_file")
-    private_key_password = request.form.get("csd_password", "").strip()
-
-    if not certificate_file or not private_key_file or not private_key_password:
+    try:
+        csd_payload = _extract_csd_payload_from_request()
+    except (ValueError, CSDParserError) as exc:
+        return flash_and_redirect(str(exc), "issuers.edit_issuer", category="error", issuer_id=issuer_id)
+    if not csd_payload:
         return flash_and_redirect(
             "Debes adjuntar .cer, .key y password del CSD.",
             "issuers.edit_issuer",
@@ -129,42 +226,8 @@ def upload_issuer_csd(issuer_id: int):
             issuer_id=issuer_id,
         )
 
-    if not _has_extension(certificate_file.filename, ".cer"):
-        return flash_and_redirect(
-            "El certificado debe tener extension .cer.",
-            "issuers.edit_issuer",
-            category="error",
-            issuer_id=issuer_id,
-        )
-    if not _has_extension(private_key_file.filename, ".key"):
-        return flash_and_redirect(
-            "La llave privada debe tener extension .key.",
-            "issuers.edit_issuer",
-            category="error",
-            issuer_id=issuer_id,
-        )
-
-    try:
-        certificate_bytes = _read_limited_upload(certificate_file, CSD_UPLOAD_MAX_FILE_BYTES)
-        private_key_bytes = _read_limited_upload(private_key_file, CSD_UPLOAD_MAX_FILE_BYTES)
-    except ValueError as exc:
-        return flash_and_redirect(str(exc), "issuers.edit_issuer", category="error", issuer_id=issuer_id)
-
-    if not certificate_bytes or not private_key_bytes:
-        return flash_and_redirect(
-            "Los archivos CSD no pueden estar vacios.",
-            "issuers.edit_issuer",
-            category="error",
-            issuer_id=issuer_id,
-        )
-
-    try:
-        cert_metadata = parse_csd_certificate(certificate_bytes)
-    except CSDParserError as exc:
-        return flash_and_redirect(str(exc), "issuers.edit_issuer", category="error", issuer_id=issuer_id)
-
     issuer_rfc = str(issuer.get("rfc", "")).strip().upper()
-    cert_rfc = str(cert_metadata.get("rfc", "")).strip().upper()
+    cert_rfc = str(csd_payload["cert_rfc"]).strip().upper()
     if not cert_rfc or cert_rfc != issuer_rfc:
         return flash_and_redirect(
             "RFC del certificado no coincide con el RFC del emisor.",
@@ -173,29 +236,85 @@ def upload_issuer_csd(issuer_id: int):
             issuer_id=issuer_id,
         )
 
-    certificate_b64 = base64.b64encode(certificate_bytes).decode("ascii")
-    private_key_b64 = base64.b64encode(private_key_bytes).decode("ascii")
     try:
-        api().upload_csd(certificate_b64, private_key_b64, private_key_password)
-    except ValueError:
-        # Duplicate CSD in Facturama is a user-controlled state, not a server error.
-        db().save_issuer_csd_metadata(issuer_id, cert_metadata)
-        return flash_and_redirect(
-            "El CSD ya existia en Facturama; se actualizo metadata local.",
-            "issuers.edit_issuer",
-            category="info",
-            issuer_id=issuer_id,
-        )
-    except FacturamaAPIError:
-        return flash_and_redirect(
-            "No se pudo subir el CSD a Facturama. Intenta nuevamente.",
-            "issuers.edit_issuer",
-            category="error",
-            issuer_id=issuer_id,
-        )
+        category, message = _upload_csd_and_persist_metadata(issuer_id, csd_payload)
+    except ValueError as exc:
+        return flash_and_redirect(str(exc), "issuers.edit_issuer", category="error", issuer_id=issuer_id)
+    return flash_and_redirect(message, "issuers.edit_issuer", category=category, issuer_id=issuer_id)
 
-    db().save_issuer_csd_metadata(issuer_id, cert_metadata)
-    return flash_and_redirect("Sello CSD actualizado.", "issuers.edit_issuer", issuer_id=issuer_id)
+
+@bp.get("/bulk-csd")
+def bulk_csd_onboarding():
+    return render_template("issuers/bulk_csd.html", row_results=None)
+
+
+@bp.post("/bulk-csd")
+def bulk_csd_onboarding_submit():
+    row_results = []
+    created_count = 0
+    indexes = sorted(
+        {
+            int(key.removeprefix("certificate_file_"))
+            for key in request.files.keys()
+            if key.startswith("certificate_file_") and key.removeprefix("certificate_file_").isdigit()
+        }
+    )
+    default_tax_regime = (request.form.get("default_tax_regime") or "").strip()
+    default_zip_code = (request.form.get("default_zip_code") or "").strip()
+    default_email = (request.form.get("default_email") or "").strip()
+
+    for index in indexes:
+        cert_file = request.files.get(f"certificate_file_{index}")
+        key_file = request.files.get(f"private_key_file_{index}")
+        password = (request.form.get(f"csd_password_{index}") or "").strip()
+        try:
+            if not cert_file or not key_file or not password:
+                raise ValueError("Debes adjuntar .cer, .key y password del CSD.")
+            if not _has_extension(cert_file.filename, ".cer"):
+                raise ValueError("El certificado debe tener extension .cer.")
+            if not _has_extension(key_file.filename, ".key"):
+                raise ValueError("La llave privada debe tener extension .key.")
+
+            cert_bytes = _read_limited_upload(cert_file, CSD_UPLOAD_MAX_FILE_BYTES)
+            key_bytes = _read_limited_upload(key_file, CSD_UPLOAD_MAX_FILE_BYTES)
+            if not cert_bytes or not key_bytes:
+                raise ValueError("Los archivos CSD no pueden estar vacios.")
+
+            cert_metadata = parse_csd_certificate(cert_bytes)
+            cert_rfc = str(cert_metadata.get("rfc", "")).strip().upper()
+            if not cert_rfc:
+                raise ValueError("No se pudo obtener RFC del certificado .cer.")
+
+            issuer_payload = {
+                "legal_name": str(cert_metadata.get("subject", "")).strip(),
+                "rfc": cert_rfc,
+                "tax_regime": (request.form.get(f"tax_regime_{index}") or default_tax_regime),
+                "zip_code": (request.form.get(f"zip_code_{index}") or default_zip_code),
+                "email": (request.form.get(f"email_{index}") or default_email),
+                "active": True,
+            }
+            issuer_id = db().save_issuer(issuer_payload)
+            try:
+                _upload_csd_and_persist_metadata(
+                    issuer_id,
+                    {
+                        "cert_metadata": cert_metadata,
+                        "cert_rfc": cert_rfc,
+                        "certificate_bytes": cert_bytes,
+                        "private_key_bytes": key_bytes,
+                        "private_key_password": password,
+                    },
+                )
+            except ValueError:
+                db().delete_issuer(issuer_id)
+                raise
+            created_count += 1
+            row_results.append({"row": index, "status": "OK", "message": cert_rfc})
+        except (ValueError, KeyError, CSDParserError) as exc:
+            row_results.append({"row": index, "status": "ERROR", "message": str(exc)})
+
+    summary_message = f"Procesadas {len(indexes)} filas. Exitosas: {created_count}. Errores: {len(indexes) - created_count}."
+    return render_template("issuers/bulk_csd.html", row_results=row_results, summary_message=summary_message)
 
 
 @api_bp.get("/")

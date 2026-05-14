@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Alta Masiva CSD - Facturama Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Alta masiva de emisores con CSD</h1>
+        <p class="page-subtitle">Carga varios paquetes .cer/.key/password y aplica datos fiscales compartidos.</p>
+    </div>
+    <a href="{{ url_for('issuers.list_issuers') }}" class="btn btn-secondary">Volver a emisores</a>
+</div>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        <div class="form-section">
+            <h3>Defaults fiscales</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="default_tax_regime">Régimen fiscal *</label>
+                    <input type="text" id="default_tax_regime" name="default_tax_regime" required value="{{ request.form.get('default_tax_regime', '601') }}">
+                </div>
+                <div class="form-group">
+                    <label for="default_zip_code">Código postal *</label>
+                    <input type="text" id="default_zip_code" name="default_zip_code" required maxlength="5" value="{{ request.form.get('default_zip_code', '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="default_email">Email default</label>
+                    <input type="email" id="default_email" name="default_email" value="{{ request.form.get('default_email', '') }}">
+                </div>
+            </div>
+        </div>
+
+        {% for i in range(1, 6) %}
+        <div class="form-section">
+            <h3>Fila {{ i }}</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="certificate_file_{{ i }}">Archivo .cer</label>
+                    <input type="file" id="certificate_file_{{ i }}" name="certificate_file_{{ i }}" accept=".cer">
+                </div>
+                <div class="form-group">
+                    <label for="private_key_file_{{ i }}">Archivo .key</label>
+                    <input type="file" id="private_key_file_{{ i }}" name="private_key_file_{{ i }}" accept=".key">
+                </div>
+                <div class="form-group">
+                    <label for="csd_password_{{ i }}">Password</label>
+                    <input type="password" id="csd_password_{{ i }}" name="csd_password_{{ i }}">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Procesar filas</button>
+        </div>
+    </form>
+</div>
+
+{% if summary_message %}
+<div class="card">
+    <h2>Resultado</h2>
+    <p class="muted-note">{{ summary_message }}</p>
+    <ul>
+        {% for row in row_results %}
+        <li>Fila {{ row.row }}: {{ row.status }} - {{ row.message }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

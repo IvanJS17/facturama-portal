@@ -8,10 +8,35 @@
         <h1>{{ 'Editar' if issuer else 'Nuevo' }} Emisor</h1>
         <p class="page-subtitle">Captura la información fiscal del emisor para habilitar facturación.</p>
     </div>
+    {% if has_bulk_csd_route %}
+    <a href="{{ url_for('issuers.bulk_csd_onboarding') }}" class="btn btn-secondary">Alta masiva CSD</a>
+    {% endif %}
 </div>
 
 <div class="card">
-    <form method="post" class="issuer-fiscal-form" action="{{ url_for('issuers.update_issuer', issuer_id=issuer.id) if issuer else url_for('issuers.create_issuer') }}">
+    <form method="post" class="issuer-fiscal-form" action="{{ url_for('issuers.update_issuer', issuer_id=issuer.id) if issuer else url_for('issuers.create_issuer') }}" enctype="multipart/form-data">
+        {% if not issuer %}
+        <div class="form-section">
+            <h3>CSD del emisor</h3>
+            <p class="muted-note">Opcional: al adjuntar CSD, se autocompletan RFC y nombre legal del certificado.</p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="certificate_file">Archivo .cer</label>
+                    <input type="file" id="certificate_file" name="certificate_file" accept=".cer">
+                </div>
+                <div class="form-group">
+                    <label for="private_key_file">Archivo .key</label>
+                    <input type="file" id="private_key_file" name="private_key_file" accept=".key">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="csd_password">Password de llave privada</label>
+                    <input type="password" id="csd_password" name="csd_password">
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <div class="form-section">
             <h3>Datos fiscales</h3>
             <div class="form-row">
@@ -84,8 +109,10 @@
             {% if has_cfdi_routes %}
             <a href="{{ url_for('cfdi.list_cfdis', issuer_id=issuer.id) }}" class="btn btn-secondary">Ver CFDIs del emisor</a>
             {% endif %}
+            {% if has_clients_routes %}
             <a href="{{ url_for('clients.list_clients', issuer_id=issuer.id) }}" class="btn btn-secondary">Ver clientes</a>
             <a href="{{ url_for('clients.new_client', issuer_id=issuer.id) }}" class="btn btn-secondary">Agregar cliente</a>
+            {% endif %}
             {% endif %}
             <a href="{{ url_for('issuers.list_issuers') }}" class="btn btn-secondary">Cancelar</a>
         </div>

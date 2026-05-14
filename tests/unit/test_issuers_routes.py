@@ -46,12 +46,14 @@ def test_issuer_form_actions_point_to_create_and_update_routes(tmp_path):
     new_response = app.test_client().get("/issuers/new")
 
     assert new_response.status_code == 200
-    assert b'<form method="post" class="issuer-fiscal-form" action="/issuers/">' in new_response.data
+    assert b'<form method="post" class="issuer-fiscal-form" action="/issuers/" enctype="multipart/form-data">' in new_response.data
 
     edit_response = app.test_client().get(f"/issuers/{issuer_id}/edit")
 
     assert edit_response.status_code == 200
-    assert f'<form method="post" class="issuer-fiscal-form" action="/issuers/{issuer_id}">'.encode() in edit_response.data
+    assert (
+        f'<form method="post" class="issuer-fiscal-form" action="/issuers/{issuer_id}" enctype="multipart/form-data">'
+    ).encode() in edit_response.data
 
 
 def test_issuer_form_includes_fiscal_normalization_js_hook(tmp_path):
