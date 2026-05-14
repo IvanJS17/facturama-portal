@@ -6,6 +6,8 @@ from src.models import PortalDatabase
 from src.routes import clients as client_routes
 from src.routes import dashboard as dashboard_routes
 from src.routes import issuers as issuer_routes
+from src.services.csd_parser import CSDParserError
+from src.services.facturama_api import FacturamaAPIError
 
 
 def make_db(tmp_path):
@@ -37,12 +39,15 @@ def issuer_payload(name="Issuer A", rfc="AAA010101AAA"):
 
 
 class FakeFacturamaAPI:
-    def __init__(self, duplicate=False):
+    def __init__(self, duplicate=False, fail=False):
         self.duplicate = duplicate
+        self.fail = fail
 
     def upload_csd(self, certificate_b64, private_key_b64, private_key_password):
         if self.duplicate:
             raise ValueError("duplicate")
+        if self.fail:
+            raise FacturamaAPIError("Upload CSD failed: boom")
         return {"status": "ok"}
 
 
@@ -161,3 +166,142 @@ def test_upload_csd_duplicate_in_api_is_non_fatal(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert b"ya existia en Facturama" in response.data
     assert database.get_latest_issuer_csd(issuer_id)["certificate_number"] == "ABC123"
+
+
+def test_upload_csd_handles_non_duplicate_facturama_error_with_controlled_flash(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    monkeypatch.setattr(
+        issuer_routes,
+        "parse_csd_certificate",
+        lambda data: {
+            "rfc": "AAA010101AAA",
+            "serial": "ABC123",
+            "subject": "CN=Acme",
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_to": "2027-01-01T00:00:00+00:00",
+        },
+    )
+    monkeypatch.setattr(issuer_routes, "api", lambda: FakeFacturamaAPI(fail=True))
+
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}/csd",
+        data={
+            "csd_password": "secret",
+            "certificate_file": (BytesIO(b"fake-cer"), "cert.cer"),
+            "private_key_file": (BytesIO(b"fake-key"), "key.key"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"No se pudo subir el CSD a Facturama" in response.data
+    assert database.get_latest_issuer_csd(issuer_id) is None
+
+
+def test_upload_csd_rejects_missing_password_or_files(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}/csd",
+        data={
+            "csd_password": "",
+            "certificate_file": (BytesIO(b"fake-cer"), "cert.cer"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Debes adjuntar .cer, .key y password del CSD" in response.data
+
+
+def test_upload_csd_rejects_empty_files(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}/csd",
+        data={
+            "csd_password": "secret",
+            "certificate_file": (BytesIO(b""), "cert.cer"),
+            "private_key_file": (BytesIO(b"fake-key"), "key.key"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Los archivos CSD no pueden estar vacios" in response.data
+
+
+def test_upload_csd_rejects_wrong_extensions(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}/csd",
+        data={
+            "csd_password": "secret",
+            "certificate_file": (BytesIO(b"fake-cer"), "cert.txt"),
+            "private_key_file": (BytesIO(b"fake-key"), "key.pem"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"El certificado debe tener extension .cer" in response.data
+
+
+def test_upload_csd_rejects_oversized_files(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    large_blob = b"x" * 70000
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}/csd",
+        data={
+            "csd_password": "secret",
+            "certificate_file": (BytesIO(large_blob), "cert.cer"),
+            "private_key_file": (BytesIO(b"fake-key"), "key.key"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"El archivo cert.cer excede el tamano maximo permitido" in response.data
+
+
+def test_upload_csd_handles_parser_error_with_controlled_flash(tmp_path, monkeypatch):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    def _raise_parser_error(_data):
+        raise CSDParserError("No se pudo leer el certificado .cer")
+
+    monkeypatch.setattr(issuer_routes, "parse_csd_certificate", _raise_parser_error)
+
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}/csd",
+        data={
+            "csd_password": "secret",
+            "certificate_file": (BytesIO(b"fake-cer"), "cert.cer"),
+            "private_key_file": (BytesIO(b"fake-key"), "key.key"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"No se pudo leer el certificado .cer" in response.data

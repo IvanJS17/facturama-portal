@@ -153,6 +153,48 @@ def test_legacy_schema_adds_missing_timestamps_and_phase1_tables(tmp_path):
     assert "client_products" in table_names
 
 
+def test_legacy_issuer_csd_table_gets_missing_columns(tmp_path):
+    db_path = tmp_path / "legacy_issuer_csd.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(
+        """
+        CREATE TABLE issuers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            legal_name TEXT NOT NULL,
+            rfc TEXT NOT NULL UNIQUE,
+            tax_regime TEXT NOT NULL,
+            zip_code TEXT NOT NULL,
+            email TEXT NOT NULL DEFAULT '',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE issuer_csd (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            issuer_id INTEGER NOT NULL,
+            certificate_number TEXT NOT NULL DEFAULT '',
+            certificate_valid_from TEXT NOT NULL DEFAULT '',
+            certificate_valid_to TEXT NOT NULL DEFAULT '',
+            private_key_encrypted INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (issuer_id) REFERENCES issuers(id)
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    database = PortalDatabase(f"sqlite:///{db_path}")
+    database.init_schema()
+
+    issuer_csd_columns = column_info(database, "issuer_csd")
+    assert "rfc" in issuer_csd_columns
+    assert "certificate_subject" in issuer_csd_columns
+
+
 def test_clients_are_unique_per_issuer_not_globally(tmp_path):
     database = make_db(tmp_path)
     issuer_a = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))

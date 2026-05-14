@@ -8,9 +8,27 @@ from flask import Blueprint, jsonify, render_template, request
 
 from src.routes.common import api, db, flash_and_redirect, row_or_404, wants_json
 from src.services.csd_parser import CSDParserError, parse_csd_certificate
+from src.services.facturama_api import FacturamaAPIError
 
 bp = Blueprint("issuers", __name__, url_prefix="/issuers")
 api_bp = Blueprint("issuer_api", __name__, url_prefix="/api/issuers")
+
+CSD_UPLOAD_MAX_FILE_BYTES = 64 * 1024
+
+
+def _has_extension(filename: str, expected_extension: str) -> bool:
+    return str(filename or "").strip().lower().endswith(expected_extension)
+
+
+def _read_limited_upload(file_storage, max_bytes: int) -> bytes:
+    content_length = getattr(file_storage, "content_length", None)
+    if content_length is not None and int(content_length) > max_bytes:
+        raise ValueError(f"El archivo {file_storage.filename} excede el tamano maximo permitido.")
+
+    uploaded = file_storage.stream.read(max_bytes + 1)
+    if len(uploaded) > max_bytes:
+        raise ValueError(f"El archivo {file_storage.filename} excede el tamano maximo permitido.")
+    return uploaded
 
 
 @bp.get("/")
@@ -93,8 +111,27 @@ def upload_issuer_csd(issuer_id: int):
             issuer_id=issuer_id,
         )
 
-    certificate_bytes = certificate_file.read()
-    private_key_bytes = private_key_file.read()
+    if not _has_extension(certificate_file.filename, ".cer"):
+        return flash_and_redirect(
+            "El certificado debe tener extension .cer.",
+            "issuers.edit_issuer",
+            category="error",
+            issuer_id=issuer_id,
+        )
+    if not _has_extension(private_key_file.filename, ".key"):
+        return flash_and_redirect(
+            "La llave privada debe tener extension .key.",
+            "issuers.edit_issuer",
+            category="error",
+            issuer_id=issuer_id,
+        )
+
+    try:
+        certificate_bytes = _read_limited_upload(certificate_file, CSD_UPLOAD_MAX_FILE_BYTES)
+        private_key_bytes = _read_limited_upload(private_key_file, CSD_UPLOAD_MAX_FILE_BYTES)
+    except ValueError as exc:
+        return flash_and_redirect(str(exc), "issuers.edit_issuer", category="error", issuer_id=issuer_id)
+
     if not certificate_bytes or not private_key_bytes:
         return flash_and_redirect(
             "Los archivos CSD no pueden estar vacios.",
@@ -129,6 +166,13 @@ def upload_issuer_csd(issuer_id: int):
             "El CSD ya existia en Facturama; se actualizo metadata local.",
             "issuers.edit_issuer",
             category="info",
+            issuer_id=issuer_id,
+        )
+    except FacturamaAPIError:
+        return flash_and_redirect(
+            "No se pudo subir el CSD a Facturama. Intenta nuevamente.",
+            "issuers.edit_issuer",
+            category="error",
             issuer_id=issuer_id,
         )
 
