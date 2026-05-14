@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request
 
 from src.routes.common import api, db, flash_and_redirect, row_or_404, wants_json
 from src.services.csd_parser import CSDParserError, parse_csd_certificate
@@ -53,10 +53,25 @@ def create_issuer():
 @bp.get("/<int:issuer_id>/edit")
 def edit_issuer(issuer_id: int):
     issuer = row_or_404(db().get_issuer(issuer_id), "Issuer not found")
+    product_search = (request.args.get("product_search") or "").strip().lower()
+    issuer_products = db().list_products(issuer_id=issuer_id)
+    if product_search:
+        issuer_products = [
+            row
+            for row in issuer_products
+            if product_search in str(row["name"]).lower()
+            or product_search in str(row["identification_number"]).lower()
+        ]
     return render_template(
         "issuers/form.html",
         issuer=issuer,
         series_list=db().list_series(issuer_id),
+        issuer_products=issuer_products,
+        product_search=product_search,
+        has_products_routes=(
+            "products.new_product" in current_app.view_functions
+            and "products.edit_product" in current_app.view_functions
+        ),
         latest_csd=db().get_latest_issuer_csd(issuer_id),
     )
 

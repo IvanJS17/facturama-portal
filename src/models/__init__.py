@@ -798,6 +798,75 @@ class PortalDatabase:
         with self.connect() as conn:
             conn.execute("DELETE FROM clients WHERE id = ?", (client_id,))
 
+    def list_client_products(self, client_id: int) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            client = conn.execute("SELECT issuer_id FROM clients WHERE id = ?", (client_id,)).fetchone()
+            if client is None:
+                return []
+            return conn.execute(
+                """
+                SELECT p.*, cp.created_at AS linked_at
+                FROM client_products cp
+                INNER JOIN products p ON p.id = cp.product_id
+                WHERE cp.client_id = ?
+                ORDER BY p.name, p.id
+                """,
+                (client_id,),
+            ).fetchall()
+
+    def set_client_products(self, client_id: int, product_ids: list[int]) -> None:
+        unique_product_ids: list[int] = []
+        seen: set[int] = set()
+        for raw in product_ids:
+            product_id = int(raw)
+            if product_id <= 0 or product_id in seen:
+                continue
+            seen.add(product_id)
+            unique_product_ids.append(product_id)
+
+        with self.connect() as conn:
+            client = conn.execute("SELECT issuer_id FROM clients WHERE id = ?", (client_id,)).fetchone()
+            if client is None:
+                raise ValueError("Client not found")
+            issuer_id = int(client["issuer_id"])
+
+            if unique_product_ids:
+                placeholders = ",".join(["?"] * len(unique_product_ids))
+                mismatch = conn.execute(
+                    f"""
+                    SELECT id
+                    FROM products
+                    WHERE id IN ({placeholders}) AND issuer_id <> ?
+                    LIMIT 1
+                    """,
+                    (*unique_product_ids, issuer_id),
+                ).fetchone()
+                if mismatch is not None:
+                    raise ValueError("Selected product does not belong to selected issuer")
+
+                existing_ids = {
+                    int(row["id"])
+                    for row in conn.execute(
+                        f"SELECT id FROM products WHERE id IN ({placeholders})",
+                        unique_product_ids,
+                    ).fetchall()
+                }
+                missing_ids = [pid for pid in unique_product_ids if pid not in existing_ids]
+                if missing_ids:
+                    raise ValueError("Selected product does not exist")
+
+            now = utc_now()
+            conn.execute("DELETE FROM client_products WHERE client_id = ?", (client_id,))
+            for product_id in unique_product_ids:
+                conn.execute(
+                    """
+                    INSERT INTO client_products
+                        (issuer_id, client_id, product_id, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (issuer_id, client_id, product_id, now, now),
+                )
+
     def _default_issuer_id(self, conn: sqlite3.Connection) -> int | None:
         return _first_issuer_id(conn)
 

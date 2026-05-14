@@ -92,6 +92,54 @@
 
 {% if issuer %}
 <div class="card">
+    <h2>Productos del emisor</h2>
+    <form method="get" action="{{ url_for('issuers.edit_issuer', issuer_id=issuer.id) }}">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="product_search">Buscar producto</label>
+                <input type="search" id="product_search" name="product_search" value="{{ product_search or '' }}" placeholder="Nombre o código">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-secondary">Filtrar</button>
+            {% if has_products_routes %}
+            <a href="{{ url_for('products.new_product', issuer_id=issuer.id) }}" class="btn btn-primary">Agregar producto</a>
+            {% endif %}
+        </div>
+    </form>
+    {% if issuer_products %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Código</th>
+                    <th>Precio</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in issuer_products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.identification_number or '-' }}</td>
+                    <td>${{ '%.2f'|format(product.price) }}</td>
+                    <td>
+                        {% if has_products_routes %}
+                        <a class="btn btn-secondary" href="{{ url_for('products.edit_product', product_id=product.id) }}">Editar</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted-note">No hay productos registrados para este emisor.</p>
+    {% endif %}
+</div>
+
+<div class="card">
     <h2>Sellos CSD</h2>
     {% if latest_csd %}
     <p class="muted-note">

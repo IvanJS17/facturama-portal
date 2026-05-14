@@ -269,6 +269,25 @@ def test_cfdi_client_backfill_and_invoiced_product_history(tmp_path):
     assert invoiced_products[0]["billed_client_rfcs"] == "ACM010101ABC"
 
 
+def test_client_product_associations_are_unique_and_issuer_scoped(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload("Issuer B", "BBB010101BBB"))
+    client_a = database.upsert_client(client_payload(issuer_a, "Client A", "CLA010101ABC"))
+    product_a1 = database.upsert_product(product_payload(issuer_a, "Service A1", "A1"))
+    product_a2 = database.upsert_product(product_payload(issuer_a, "Service A2", "A2"))
+    product_b1 = database.upsert_product(product_payload(issuer_b, "Service B1", "B1"))
+
+    database.set_client_products(client_a, [product_a1, product_a1, product_a2])
+    linked = database.list_client_products(client_a)
+
+    assert [row["id"] for row in linked] == [product_a1, product_a2]
+    assert all(row["issuer_id"] == issuer_a for row in linked)
+
+    with pytest.raises(ValueError, match="selected issuer"):
+        database.set_client_products(client_a, [product_b1])
+
+
 def test_legacy_schema_migrates_without_dropping_issuer_id_or_history(tmp_path):
     db_path = tmp_path / "legacy.db"
     conn = sqlite3.connect(db_path)

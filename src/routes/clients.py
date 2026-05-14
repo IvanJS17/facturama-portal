@@ -27,6 +27,19 @@ def _issuer_zip_map() -> dict[str, str]:
     return {str(row["id"]): str(row["zip_code"]) for row in db().list_issuers()}
 
 
+def _parse_product_ids(payload) -> list[int]:
+    raw_ids = payload.getlist("product_ids") if hasattr(payload, "getlist") else payload.get("product_ids", [])
+    if isinstance(raw_ids, str):
+        raw_ids = [raw_ids]
+    parsed: list[int] = []
+    for raw in raw_ids or []:
+        try:
+            parsed.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    return parsed
+
+
 def _enforce_generic_rfc_defaults(payload: dict) -> dict:
     """Apply server-side generic receptor defaults for RFC XAXX010101000."""
     issuer_id = _require_existing_issuer(payload)
@@ -80,6 +93,8 @@ def new_client():
         client=None,
         issuers=db().list_issuers(),
         selected_issuer_id=selected_issuer_id,
+        available_products=db().list_products(issuer_id=selected_issuer_id) if selected_issuer_id else [],
+        selected_product_ids=[],
         issuer_zip_codes_json=json.dumps(_issuer_zip_map(), ensure_ascii=False, separators=(",", ":")),
     )
 
@@ -93,6 +108,7 @@ def create_client():
         facturama_response = api().create_client(build_client_payload(payload))
     try:
         client_id = db().upsert_client(_form_to_local(payload, facturama_response))
+        db().set_client_products(client_id, _parse_product_ids(request.form))
     except ValueError as exc:
         return flash_and_redirect(
             f"Error de validacion fiscal: {exc}",
@@ -106,11 +122,14 @@ def create_client():
 @bp.get("/<int:client_id>/edit")
 def edit_client(client_id: int):
     client = row_or_404(db().get_client(client_id), "Client not found")
+    selected_products = db().list_client_products(client_id)
     return render_template(
         "clients/form.html",
         client=client,
         issuers=db().list_issuers(),
         selected_issuer_id=client.get("issuer_id"),
+        available_products=db().list_products(issuer_id=client.get("issuer_id")),
+        selected_product_ids=[int(row["id"]) for row in selected_products],
         issuer_zip_codes_json=json.dumps(_issuer_zip_map(), ensure_ascii=False, separators=(",", ":")),
     )
 
@@ -125,6 +144,7 @@ def update_client(client_id: int):
         facturama_response = api().update_client(existing["facturama_id"], build_client_payload(payload))
     try:
         db().upsert_client(_form_to_local(payload, facturama_response), client_id)
+        db().set_client_products(client_id, _parse_product_ids(request.form))
     except ValueError as exc:
         return flash_and_redirect(
             f"Error de validacion fiscal: {exc}",

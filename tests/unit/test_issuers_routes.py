@@ -166,3 +166,36 @@ def test_api_create_issuer_invalid_fiscal_fields_returns_400_json(tmp_path):
     body = response.get_json()
     assert "error" in body
     assert database.list_issuers() == []
+
+
+def product_payload(issuer_id, name="Service", sku="SKU-1"):
+    return {
+        "issuer_id": issuer_id,
+        "facturama_id": "",
+        "name": name,
+        "identification_number": sku,
+        "product_code": "01010101",
+        "unit_code": "E48",
+        "unit": "Servicio",
+        "price": 100,
+        "tax_object": "02",
+        "raw_payload": {},
+    }
+
+
+def test_issuer_edit_renders_issuer_products_and_add_product_link(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload(name="Issuer B", rfc="BBB010101BBB"))
+    product_a = database.upsert_product(product_payload(issuer_a, name="Servicio A", sku="A-1"))
+    database.upsert_product(product_payload(issuer_b, name="Servicio B", sku="B-1"))
+    app = make_app(database)
+
+    response = app.test_client().get(f"/issuers/{issuer_a}/edit")
+
+    assert response.status_code == 200
+    assert b"Productos del emisor" in response.data
+    assert b"Servicio A" in response.data
+    assert b"Servicio B" not in response.data
+    assert f"/products/new?issuer_id={issuer_a}".encode() in response.data
+    assert f"/products/{product_a}/edit".encode() in response.data

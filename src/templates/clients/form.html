@@ -26,6 +26,39 @@
         </div>
 
         <div class="form-section">
+            <h3>Productos asociados</h3>
+            {% if available_products %}
+            <div class="form-group">
+                <input type="search" id="products-filter" placeholder="Filtrar por nombre o código" autocomplete="off">
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Seleccionar</th>
+                            <th>Producto</th>
+                            <th>Código</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-list">
+                        {% for product in available_products %}
+                        <tr data-product-filter="{{ (product.name ~ ' ' ~ product.identification_number)|lower }}">
+                            <td>
+                                <input type="checkbox" name="product_ids" value="{{ product.id }}" {{ 'checked' if product.id in selected_product_ids else '' }}>
+                            </td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.identification_number or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="muted-note">No hay productos disponibles para este emisor.</p>
+            {% endif %}
+        </div>
+
+        <div class="form-section">
             <h3>Datos fiscales del receptor</h3>
             <div class="form-row">
                 <div class="form-group">
@@ -120,4 +153,20 @@
 </div>
 <script id="issuer-zip-codes" type="application/json">{{ issuer_zip_codes_json | safe }}</script>
 <script src="{{ url_for('static', filename='fiscal_forms.js') }}"></script>
+<script>
+(() => {
+    const filter = document.getElementById("products-filter");
+    const list = document.getElementById("products-list");
+    if (!filter || !list) {
+        return;
+    }
+    filter.addEventListener("input", () => {
+        const query = filter.value.trim().toLowerCase();
+        list.querySelectorAll("tr[data-product-filter]").forEach((row) => {
+            const visible = !query || row.dataset.productFilter.includes(query);
+            row.style.display = visible ? "" : "none";
+        });
+    });
+})();
+</script>
 {% endblock %}

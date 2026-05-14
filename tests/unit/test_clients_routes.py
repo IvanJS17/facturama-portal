@@ -286,3 +286,92 @@ def test_api_create_client_enforces_generic_rfc_defaults_server_side(tmp_path):
     assert saved["tax_regime"] == "616"
     assert saved["cfdi_use"] == "S01"
     assert saved["zip_code"] == "01000"
+
+
+def product_payload(issuer_id, name="Service", sku="SKU-1"):
+    return {
+        "issuer_id": issuer_id,
+        "facturama_id": "",
+        "name": name,
+        "identification_number": sku,
+        "product_code": "01010101",
+        "unit_code": "E48",
+        "unit": "Servicio",
+        "price": 100,
+        "tax_object": "02",
+        "raw_payload": {},
+    }
+
+
+def test_new_client_form_shows_products_for_preselected_issuer(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload(name="Issuer B", rfc="BBB010101BBB"))
+    product_a = database.upsert_product(product_payload(issuer_a, name="Servicio A", sku="A-1"))
+    database.upsert_product(product_payload(issuer_b, name="Servicio B", sku="B-1"))
+    app = make_app(database)
+
+    response = app.test_client().get(f"/clients/new?issuer_id={issuer_a}")
+
+    assert response.status_code == 200
+    assert f'value="{product_a}"'.encode() in response.data
+    assert b"Servicio A" in response.data
+    assert b"Servicio B" not in response.data
+
+
+def test_create_client_persists_selected_product_associations(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    product_1 = database.upsert_product(product_payload(issuer_id, name="Servicio 1", sku="S-1"))
+    product_2 = database.upsert_product(product_payload(issuer_id, name="Servicio 2", sku="S-2"))
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/clients/",
+        data={**client_payload(issuer_id), "product_ids": [str(product_1), str(product_2)]},
+    )
+
+    assert response.status_code == 302
+    client_id = database.list_clients(issuer_id=issuer_id)[0]["id"]
+    linked = database.list_client_products(client_id)
+    assert [row["id"] for row in linked] == [product_1, product_2]
+
+
+def test_edit_client_form_shows_current_issuer_products_and_selected_associations(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload(name="Issuer B", rfc="BBB010101BBB"))
+    client_id = database.upsert_client(client_payload(issuer_a))
+    product_a = database.upsert_product(product_payload(issuer_a, name="Servicio A", sku="A-1"))
+    database.upsert_product(product_payload(issuer_b, name="Servicio B", sku="B-1"))
+    database.set_client_products(client_id, [product_a])
+    app = make_app(database)
+
+    response = app.test_client().get(f"/clients/{client_id}/edit")
+
+    assert response.status_code == 200
+    assert b"Servicio A" in response.data
+    assert b"Servicio B" not in response.data
+    assert f'value="{product_a}" checked'.encode() in response.data
+
+
+def test_update_client_rejects_cross_issuer_product_association(tmp_path):
+    database = make_db(tmp_path)
+    issuer_a = database.save_issuer(issuer_payload(name="Issuer A", rfc="AAA010101AAA"))
+    issuer_b = database.save_issuer(issuer_payload(name="Issuer B", rfc="BBB010101BBB"))
+    client_id = database.upsert_client(client_payload(issuer_a))
+    product_a = database.upsert_product(product_payload(issuer_a, name="Servicio A", sku="A-1"))
+    product_b = database.upsert_product(product_payload(issuer_b, name="Servicio B", sku="B-1"))
+    database.set_client_products(client_id, [product_a])
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/clients/{client_id}",
+        data={**client_payload(issuer_a), "product_ids": [str(product_b)]},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"selected issuer" in response.data
+    linked = database.list_client_products(client_id)
+    assert [row["id"] for row in linked] == [product_a]
