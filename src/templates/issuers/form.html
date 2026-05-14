@@ -42,11 +42,11 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="rfc">RFC *</label>
-                    <input type="text" id="rfc" name="rfc" value="{{ issuer.rfc if issuer else '' }}" required maxlength="13" placeholder="XAXX010101000" data-fiscal-rfc>
+                    <input type="text" id="rfc" name="rfc" value="{{ issuer.rfc if issuer else '' }}" {{ 'required' if issuer else '' }} maxlength="13" placeholder="XAXX010101000" data-fiscal-rfc>
                 </div>
                 <div class="form-group">
                     <label for="legal_name">Nombre legal *</label>
-                    <input type="text" id="legal_name" name="legal_name" value="{{ issuer.legal_name if issuer else '' }}" required placeholder="EMPRESA SA DE CV" data-fiscal-legal-name>
+                    <input type="text" id="legal_name" name="legal_name" value="{{ issuer.legal_name if issuer else '' }}" {{ 'required' if issuer else '' }} placeholder="EMPRESA SA DE CV" data-fiscal-legal-name>
                 </div>
             </div>
             <div class="form-row">

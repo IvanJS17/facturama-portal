@@ -75,6 +75,8 @@ def test_issuer_new_renders_csd_first_section_and_bulk_link(tmp_path):
     assert b'name="certificate_file"' in response.data
     assert b'name="private_key_file"' in response.data
     assert b'name="csd_password"' in response.data
+    assert b'<input type="text" id="rfc" name="rfc" value=""  maxlength="13"' in response.data
+    assert b'<input type="text" id="legal_name" name="legal_name" value=""  placeholder=' in response.data
     assert b"/issuers/bulk-csd" in response.data
 
 
