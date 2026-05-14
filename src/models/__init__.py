@@ -571,6 +571,12 @@ class PortalDatabase:
         with self.connect() as conn:
             return conn.execute(
                 """
+                WITH latest_active_csd AS (
+                    SELECT issuer_id, MAX(id) AS latest_id
+                    FROM issuer_csd
+                    WHERE active = 1
+                    GROUP BY issuer_id
+                )
                 SELECT
                     c.id,
                     c.issuer_id,
@@ -582,10 +588,11 @@ class PortalDatabase:
                     c.certificate_valid_from,
                     c.certificate_valid_to,
                     CAST(julianday(date(c.certificate_valid_to)) - julianday(date(?)) AS INTEGER) AS days_to_expiration
-                FROM issuer_csd c
+                FROM latest_active_csd la
+                INNER JOIN issuer_csd c ON c.id = la.latest_id
                 INNER JOIN issuers i ON i.id = c.issuer_id
-                WHERE c.active = 1
-                  AND c.certificate_valid_to <> ''
+                WHERE c.certificate_valid_to <> ''
+                  AND date(c.certificate_valid_to) IS NOT NULL
                   AND CAST(julianday(date(c.certificate_valid_to)) - julianday(date(?)) AS INTEGER) <= ?
                 ORDER BY days_to_expiration ASC, c.id DESC
                 """,

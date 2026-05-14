@@ -79,6 +79,9 @@ def test_list_expiring_issuer_csds_returns_latest_active_with_days_to_expiration
             "valid_to": "2026-05-20T00:00:00+00:00",
         },
     )
+    # Simulate bad data state where multiple rows remain active for the same issuer.
+    with database.connect() as conn:
+        conn.execute("UPDATE issuer_csd SET active = 1 WHERE issuer_id = ?", (issuer_a,))
     database.save_issuer_csd_metadata(
         issuer_b,
         {
@@ -129,3 +132,47 @@ def test_list_expiring_issuer_csds_respects_window_days(tmp_path):
     rows = database.list_expiring_issuer_csds(reference_date="2026-05-14", window_days=60)
     assert len(rows) == 1
     assert rows[0]["days_to_expiration"] == 46
+
+
+def test_list_expiring_issuer_csds_excludes_empty_and_malformed_dates(tmp_path):
+    database = make_db(tmp_path)
+    issuer_empty = database.save_issuer(issuer_payload("Issuer Empty", "EEE010101EEE"))
+    issuer_malformed = database.save_issuer(issuer_payload("Issuer Bad", "DDD010101DDD"))
+    issuer_valid = database.save_issuer(issuer_payload("Issuer Good", "GGG010101GGG"))
+
+    database.save_issuer_csd_metadata(
+        issuer_empty,
+        {
+            "rfc": "EEE010101EEE",
+            "serial": "EMPTY-DATE",
+            "subject": "CN=Empty",
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_to": "",
+        },
+    )
+    database.save_issuer_csd_metadata(
+        issuer_malformed,
+        {
+            "rfc": "DDD010101DDD",
+            "serial": "BAD-DATE",
+            "subject": "CN=Bad",
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_to": "not-a-date",
+        },
+    )
+    database.save_issuer_csd_metadata(
+        issuer_valid,
+        {
+            "rfc": "GGG010101GGG",
+            "serial": "GOOD-DATE",
+            "subject": "CN=Good",
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_to": "2026-05-20T00:00:00+00:00",
+        },
+    )
+
+    rows = database.list_expiring_issuer_csds(reference_date="2026-05-14", window_days=90)
+
+    assert len(rows) == 1
+    assert rows[0]["issuer_rfc"] == "GGG010101GGG"
+    assert rows[0]["certificate_number"] == "GOOD-DATE"
