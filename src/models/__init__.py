@@ -429,7 +429,9 @@ class PortalDatabase:
             CREATE TABLE IF NOT EXISTS issuer_csd (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 issuer_id INTEGER NOT NULL,
+                rfc TEXT NOT NULL DEFAULT '',
                 certificate_number TEXT NOT NULL DEFAULT '',
+                certificate_subject TEXT NOT NULL DEFAULT '',
                 certificate_valid_from TEXT NOT NULL DEFAULT '',
                 certificate_valid_to TEXT NOT NULL DEFAULT '',
                 private_key_encrypted INTEGER NOT NULL DEFAULT 0,
@@ -442,6 +444,11 @@ class PortalDatabase:
             ON issuer_csd(issuer_id, active);
             """
         )
+        columns = _table_columns(conn, "issuer_csd")
+        if "rfc" not in columns:
+            conn.execute("ALTER TABLE issuer_csd ADD COLUMN rfc TEXT NOT NULL DEFAULT ''")
+        if "certificate_subject" not in columns:
+            conn.execute("ALTER TABLE issuer_csd ADD COLUMN certificate_subject TEXT NOT NULL DEFAULT ''")
 
     def _ensure_client_products(self, conn: sqlite3.Connection) -> None:
         conn.executescript(
@@ -497,6 +504,67 @@ class PortalDatabase:
     def get_series(self, series_id: int) -> sqlite3.Row | None:
         with self.connect() as conn:
             return conn.execute("SELECT * FROM invoice_series WHERE id = ?", (series_id,)).fetchone()
+
+    def save_issuer_csd_metadata(self, issuer_id: int, metadata: dict[str, Any]) -> int:
+        now = utc_now()
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE issuer_csd SET active = 0, updated_at = ? WHERE issuer_id = ? AND active = 1",
+                (now, issuer_id),
+            )
+            cursor = conn.execute(
+                """
+                INSERT INTO issuer_csd (
+                    issuer_id,
+                    rfc,
+                    certificate_number,
+                    certificate_subject,
+                    certificate_valid_from,
+                    certificate_valid_to,
+                    private_key_encrypted,
+                    active,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+                """,
+                (
+                    issuer_id,
+                    str(metadata.get("rfc", "")).strip().upper(),
+                    str(metadata.get("serial", "")).strip(),
+                    str(metadata.get("subject", "")).strip(),
+                    str(metadata.get("valid_from", "")).strip(),
+                    str(metadata.get("valid_to", "")).strip(),
+                    now,
+                    now,
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def list_issuer_csd_metadata(self, issuer_id: int) -> list[sqlite3.Row]:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT *
+                FROM issuer_csd
+                WHERE issuer_id = ?
+                ORDER BY id DESC
+                """,
+                (issuer_id,),
+            ).fetchall()
+
+    def get_latest_issuer_csd(self, issuer_id: int) -> sqlite3.Row | None:
+        with self.connect() as conn:
+            return conn.execute(
+                """
+                SELECT *
+                FROM issuer_csd
+                WHERE issuer_id = ?
+                ORDER BY active DESC, id DESC
+                LIMIT 1
+                """,
+                (issuer_id,),
+            ).fetchone()
 
     def get_next_folio(self, issuer_id: int, series: str) -> int:
         cleaned_series = (series or "FAC").strip().upper()

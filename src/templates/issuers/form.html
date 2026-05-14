@@ -91,6 +91,39 @@
 
 {% if issuer %}
 <div class="card">
+    <h2>Sellos CSD</h2>
+    {% if latest_csd %}
+    <p class="muted-note">
+        RFC: {{ latest_csd.rfc }} | Serie certificado: {{ latest_csd.certificate_number }} |
+        Vigencia: {{ latest_csd.certificate_valid_from }} a {{ latest_csd.certificate_valid_to }}
+    </p>
+    {% else %}
+    <p class="muted-note">Este emisor aun no tiene metadata de CSD registrada.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('issuers.upload_issuer_csd', issuer_id=issuer.id) }}" enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="certificate_file">Archivo .cer *</label>
+                <input type="file" id="certificate_file" name="certificate_file" accept=".cer" required>
+            </div>
+            <div class="form-group">
+                <label for="private_key_file">Archivo .key *</label>
+                <input type="file" id="private_key_file" name="private_key_file" accept=".key" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="csd_password">Password de llave privada *</label>
+                <input type="password" id="csd_password" name="csd_password" required>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Subir o reemplazar CSD</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h2>Series de facturación</h2>
     {% if series_list %}
     <div class="table-wrap">

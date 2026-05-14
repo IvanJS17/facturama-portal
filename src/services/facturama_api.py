@@ -139,6 +139,28 @@ class FacturamaAPI:
             raise FileNotFoundError(f"Downloaded CFDI acuse file not found: {file_path}")
         return file_path
 
+
+    def upload_csd(self, certificate_b64: str, private_key_b64: str, private_key_password: str) -> dict[str, Any]:
+        payload = {
+            "Certificate": certificate_b64,
+            "PrivateKey": private_key_b64,
+            "PrivateKeyPassword": private_key_password,
+        }
+        try:
+            return self._call(
+                "Upload CSD",
+                CfdiMultiEmisor.build_http_request,
+                "post",
+                "csds",
+                payload,
+                version=0,
+            )
+        except FacturamaAPIError as exc:
+            message = str(exc).lower()
+            if "already" in message or "exist" in message or "duplicate" in message:
+                raise ValueError("CSD already exists") from exc
+            raise
+
     def cache_cfdi_result(
         self,
         result: dict[str, Any],
