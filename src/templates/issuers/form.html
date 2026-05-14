@@ -11,17 +11,17 @@
 </div>
 
 <div class="card">
-    <form method="post" action="{{ url_for('issuers.update_issuer', issuer_id=issuer.id) if issuer else url_for('issuers.create_issuer') }}">
+    <form method="post" class="issuer-fiscal-form" action="{{ url_for('issuers.update_issuer', issuer_id=issuer.id) if issuer else url_for('issuers.create_issuer') }}">
         <div class="form-section">
             <h3>Datos fiscales</h3>
             <div class="form-row">
                 <div class="form-group">
                     <label for="rfc">RFC *</label>
-                    <input type="text" id="rfc" name="rfc" value="{{ issuer.rfc if issuer else '' }}" required maxlength="13" placeholder="XAXX010101000">
+                    <input type="text" id="rfc" name="rfc" value="{{ issuer.rfc if issuer else '' }}" required maxlength="13" placeholder="XAXX010101000" data-fiscal-rfc>
                 </div>
                 <div class="form-group">
                     <label for="legal_name">Nombre legal *</label>
-                    <input type="text" id="legal_name" name="legal_name" value="{{ issuer.legal_name if issuer else '' }}" required placeholder="EMPRESA SA DE CV">
+                    <input type="text" id="legal_name" name="legal_name" value="{{ issuer.legal_name if issuer else '' }}" required placeholder="EMPRESA SA DE CV" data-fiscal-legal-name>
                 </div>
             </div>
             <div class="form-row">
@@ -58,7 +58,7 @@
                 </div>
                 <div class="form-group">
                     <label for="zip_code">Código postal *</label>
-                    <input type="text" id="zip_code" name="zip_code" value="{{ issuer.zip_code if issuer else '' }}" required maxlength="5" placeholder="78116">
+                    <input type="text" id="zip_code" name="zip_code" value="{{ issuer.zip_code if issuer else '' }}" required maxlength="5" placeholder="78116" data-fiscal-zip>
                 </div>
             </div>
             <div class="form-row">
@@ -88,6 +88,7 @@
         </div>
     </form>
 </div>
+<script src="{{ url_for('static', filename='fiscal_forms.js') }}"></script>
 
 {% if issuer %}
 <div class="card">

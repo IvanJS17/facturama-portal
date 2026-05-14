@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch
 
 from src.models import PortalDatabase
+from src.services.facturama_api import build_cfdi_payload
 from src.services.facturama_service import FacturamaService, FacturamaServiceError
 from src.utils.config import Config
 
@@ -114,3 +115,37 @@ def test_cache_cfdi_result_persists_client_and_item_links(tmp_path, mock_config)
     assert len(cfdis) == 1
     assert cfdis[0]["client_id"] == client_id
     assert database.list_invoiced_products(issuer_id=issuer_id)[0]["billed_client_names"] == "CLIENTE A"
+
+
+def test_build_cfdi_payload_keeps_generic_rfc_without_global_information():
+    payload = build_cfdi_payload(
+        {
+            "quantity": 1,
+            "unit_price": 100,
+            "iva_rate": 0.16,
+            "payment_form": "03",
+            "payment_method": "PUE",
+            "cfdi_type": "I",
+            "currency": "MXN",
+        },
+        {"rfc": "AAA010101AAA", "legal_name": "ISSUER", "tax_regime": "601", "zip_code": "01000"},
+        {
+            "rfc": "XAXX010101000",
+            "legal_name": "PÚBLICO EN GENERAL",
+            "cfdi_use": "S01",
+            "tax_regime": "616",
+            "zip_code": "01000",
+        },
+        {
+            "name": "Servicio",
+            "identification_number": "SKU-1",
+            "product_code": "01010101",
+            "unit_code": "E48",
+            "unit": "Servicio",
+            "tax_object": "02",
+            "price": 100,
+        },
+    )
+
+    assert payload["Receiver"]["Rfc"] == "XAXX010101000"
+    assert "GlobalInformation" not in payload

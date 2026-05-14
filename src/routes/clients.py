@@ -1,5 +1,7 @@
 """Client routes."""
 
+import json
+
 from flask import Blueprint, abort, jsonify, render_template, request
 
 from src.routes.common import api, db, flash_and_redirect, row_or_404
@@ -7,6 +9,7 @@ from src.services.facturama_api import build_client_payload
 
 bp = Blueprint("clients", __name__, url_prefix="/clients")
 api_bp = Blueprint("clients_api", __name__, url_prefix="/api/clients")
+GENERIC_RFC = "XAXX010101000"
 
 
 def _require_existing_issuer(payload: dict) -> int:
@@ -18,6 +21,26 @@ def _require_existing_issuer(payload: dict) -> int:
     if not issuer_id or db().get_issuer(issuer_id) is None:
         abort(400, "Selecciona un emisor válido para el cliente")
     return issuer_id
+
+
+def _issuer_zip_map() -> dict[str, str]:
+    return {str(row["id"]): str(row["zip_code"]) for row in db().list_issuers()}
+
+
+def _enforce_generic_rfc_defaults(payload: dict) -> dict:
+    """Apply server-side generic receptor defaults for RFC XAXX010101000."""
+    issuer_id = _require_existing_issuer(payload)
+    normalized_rfc = str(payload.get("rfc") or "").strip().upper()
+    if normalized_rfc != GENERIC_RFC:
+        return payload
+    issuer = db().get_issuer(issuer_id)
+    issuer_zip_code = str(issuer["zip_code"]) if issuer else ""
+    payload["rfc"] = GENERIC_RFC
+    payload["legal_name"] = "PÚBLICO EN GENERAL"
+    payload["tax_regime"] = "616"
+    payload["cfdi_use"] = "S01"
+    payload["zip_code"] = issuer_zip_code
+    return payload
 
 
 def _form_to_local(payload: dict, facturama_response: dict | None = None) -> dict:
@@ -57,12 +80,14 @@ def new_client():
         client=None,
         issuers=db().list_issuers(),
         selected_issuer_id=selected_issuer_id,
+        issuer_zip_codes_json=json.dumps(_issuer_zip_map(), ensure_ascii=False, separators=(",", ":")),
     )
 
 
 @bp.post("/")
 def create_client():
     payload = request.form.to_dict()
+    payload = _enforce_generic_rfc_defaults(payload)
     facturama_response = {}
     if request.form.get("sync_facturama"):
         facturama_response = api().create_client(build_client_payload(payload))
@@ -86,12 +111,14 @@ def edit_client(client_id: int):
         client=client,
         issuers=db().list_issuers(),
         selected_issuer_id=client.get("issuer_id"),
+        issuer_zip_codes_json=json.dumps(_issuer_zip_map(), ensure_ascii=False, separators=(",", ":")),
     )
 
 
 @bp.post("/<int:client_id>")
 def update_client(client_id: int):
     payload = request.form.to_dict()
+    payload = _enforce_generic_rfc_defaults(payload)
     existing = row_or_404(db().get_client(client_id), "Client not found")
     facturama_response = {}
     if request.form.get("sync_facturama") and existing.get("facturama_id"):
@@ -126,6 +153,7 @@ def api_list_clients():
 @api_bp.post("/")
 def api_create_client():
     payload = request.get_json() or {}
+    payload = _enforce_generic_rfc_defaults(payload)
     facturama_response = api().create_client(build_client_payload(payload)) if payload.get("sync_facturama") else {}
     try:
         client_id = db().upsert_client(_form_to_local(payload, facturama_response))

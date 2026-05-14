@@ -111,13 +111,26 @@ def test_client_form_actions_point_to_create_and_update_routes(tmp_path):
     new_response = app.test_client().get("/clients/new")
 
     assert new_response.status_code == 200
-    assert b'<form method="post" action="/clients/">' in new_response.data
+    assert b'<form method="post" class="client-fiscal-form" action="/clients/">' in new_response.data
 
     client_id = database.upsert_client(client_payload(issuer_id))
     edit_response = app.test_client().get(f"/clients/{client_id}/edit")
 
     assert edit_response.status_code == 200
-    assert f'<form method="post" action="/clients/{client_id}">'.encode() in edit_response.data
+    assert f'<form method="post" class="client-fiscal-form" action="/clients/{client_id}">'.encode() in edit_response.data
+
+
+def test_client_form_includes_fiscal_normalization_js_and_issuer_zip_data(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload(name="Issuer Zip", rfc="IZP010101AAA"))
+    app = make_app(database)
+
+    response = app.test_client().get(f"/clients/new?issuer_id={issuer_id}")
+
+    assert response.status_code == 200
+    assert b'id="issuer-zip-codes"' in response.data
+    assert b'"%d":"01000"' % issuer_id in response.data
+    assert b"client-fiscal-form" in response.data
 
 
 def test_create_client_invalid_fiscal_fields_shows_validation_error_without_500(tmp_path):
@@ -192,3 +205,84 @@ def test_api_create_client_invalid_fiscal_fields_returns_400_json(tmp_path):
     body = response.get_json()
     assert "error" in body
     assert database.list_clients(issuer_id=issuer_id) == []
+
+
+def test_create_client_enforces_generic_rfc_defaults_server_side(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload(name="Issuer Generic", rfc="IGE010101AAA"))
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/clients/",
+        data={
+            "issuer_id": str(issuer_id),
+            "legal_name": "otro nombre",
+            "rfc": "xaxx010101000",
+            "email": "cliente@example.com",
+            "tax_regime": "601",
+            "cfdi_use": "G03",
+            "zip_code": "99999",
+        },
+    )
+
+    assert response.status_code == 302
+    saved = database.list_clients(issuer_id=issuer_id)[0]
+    assert saved["rfc"] == "XAXX010101000"
+    assert saved["legal_name"] == "PÚBLICO EN GENERAL"
+    assert saved["tax_regime"] == "616"
+    assert saved["cfdi_use"] == "S01"
+    assert saved["zip_code"] == "01000"
+
+
+def test_update_client_enforces_generic_rfc_defaults_server_side(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload(name="Issuer Generic", rfc="IGE010101AAA"))
+    client_id = database.upsert_client(client_payload(issuer_id))
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/clients/{client_id}",
+        data={
+            "issuer_id": str(issuer_id),
+            "legal_name": "nombre libre",
+            "rfc": "XAXX010101000",
+            "email": "cliente@example.com",
+            "tax_regime": "601",
+            "cfdi_use": "G03",
+            "zip_code": "88888",
+        },
+    )
+
+    assert response.status_code == 302
+    saved = database.get_client(client_id)
+    assert saved["legal_name"] == "PÚBLICO EN GENERAL"
+    assert saved["tax_regime"] == "616"
+    assert saved["cfdi_use"] == "S01"
+    assert saved["zip_code"] == "01000"
+
+
+def test_api_create_client_enforces_generic_rfc_defaults_server_side(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload(name="Issuer Generic", rfc="IGE010101AAA"))
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/api/clients/",
+        json={
+            "issuer_id": issuer_id,
+            "legal_name": "cliente libre",
+            "rfc": "xaxx010101000",
+            "email": "cliente@example.com",
+            "tax_regime": "601",
+            "cfdi_use": "G03",
+            "zip_code": "77777",
+        },
+    )
+
+    assert response.status_code == 201
+    client_id = response.get_json()["id"]
+    saved = database.get_client(client_id)
+    assert saved["legal_name"] == "PÚBLICO EN GENERAL"
+    assert saved["tax_regime"] == "616"
+    assert saved["cfdi_use"] == "S01"
+    assert saved["zip_code"] == "01000"

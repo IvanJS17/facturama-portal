@@ -259,6 +259,8 @@ def build_cfdi_payload(
             "FiscalRegime": client["tax_regime"],
             "TaxZipCode": client["zip_code"],
         },
+        # NOTE(phase4): Generic RFC global invoice emission is intentionally deferred.
+        # We do not attach GlobalInformation yet even when receiver RFC is XAXX010101000.
         "Items": [
             {
                 "ProductCode": product["product_code"],

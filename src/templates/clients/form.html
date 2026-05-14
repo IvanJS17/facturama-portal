@@ -11,7 +11,7 @@
 </div>
 
 <div class="card">
-    <form method="post" action="{{ url_for('clients.update_client', client_id=client.id) if client else url_for('clients.create_client') }}">
+    <form method="post" class="client-fiscal-form" action="{{ url_for('clients.update_client', client_id=client.id) if client else url_for('clients.create_client') }}">
         <div class="form-section">
             <h3>Vinculación de emisor</h3>
             <div class="form-group">
@@ -30,11 +30,11 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="rfc">RFC *</label>
-                    <input type="text" id="rfc" name="rfc" value="{{ client.rfc if client else '' }}" required maxlength="13" placeholder="XAXX010101000">
+                    <input type="text" id="rfc" name="rfc" value="{{ client.rfc if client else '' }}" required maxlength="13" placeholder="XAXX010101000" data-fiscal-rfc>
                 </div>
                 <div class="form-group">
                     <label for="legal_name">Nombre / Razón social *</label>
-                    <input type="text" id="legal_name" name="legal_name" value="{{ client.legal_name if client else '' }}" required placeholder="CLIENTE SA DE CV">
+                    <input type="text" id="legal_name" name="legal_name" value="{{ client.legal_name if client else '' }}" required placeholder="CLIENTE SA DE CV" data-fiscal-legal-name>
                 </div>
             </div>
             <div class="form-row">
@@ -106,9 +106,10 @@
                 </div>
                 <div class="form-group">
                     <label for="zip_code">Código postal *</label>
-                    <input type="text" id="zip_code" name="zip_code" value="{{ client.zip_code if client else '' }}" required maxlength="5" placeholder="78116">
+                    <input type="text" id="zip_code" name="zip_code" value="{{ client.zip_code if client else '' }}" required maxlength="5" placeholder="78116" data-fiscal-zip>
                 </div>
             </div>
+            <p class="muted-note" id="generic-rfc-hint" aria-live="polite"></p>
         </div>
 
         <div class="form-actions">
@@ -117,4 +118,6 @@
         </div>
     </form>
 </div>
+<script id="issuer-zip-codes" type="application/json">{{ issuer_zip_codes_json | safe }}</script>
+<script src="{{ url_for('static', filename='fiscal_forms.js') }}"></script>
 {% endblock %}

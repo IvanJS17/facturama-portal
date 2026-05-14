@@ -46,12 +46,22 @@ def test_issuer_form_actions_point_to_create_and_update_routes(tmp_path):
     new_response = app.test_client().get("/issuers/new")
 
     assert new_response.status_code == 200
-    assert b'<form method="post" action="/issuers/">' in new_response.data
+    assert b'<form method="post" class="issuer-fiscal-form" action="/issuers/">' in new_response.data
 
     edit_response = app.test_client().get(f"/issuers/{issuer_id}/edit")
 
     assert edit_response.status_code == 200
-    assert f'<form method="post" action="/issuers/{issuer_id}">'.encode() in edit_response.data
+    assert f'<form method="post" class="issuer-fiscal-form" action="/issuers/{issuer_id}">'.encode() in edit_response.data
+
+
+def test_issuer_form_includes_fiscal_normalization_js_hook(tmp_path):
+    database = make_db(tmp_path)
+    app = make_app(database)
+
+    response = app.test_client().get("/issuers/new")
+
+    assert response.status_code == 200
+    assert b"issuer-fiscal-form" in response.data
 
 
 def test_issuer_edit_route_rejects_post_and_update_route_accepts_post(tmp_path):
