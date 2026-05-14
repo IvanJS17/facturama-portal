@@ -169,7 +169,12 @@ class SATSearchSelect {
         const code = result[this.options.valueField] || '';
         const desc = result[this.options.displayField] || '';
         
-        this.input.value = `${code} - ${desc}`;
+        // Use formatSelection if provided, otherwise use default format
+        if (this.options.formatSelection) {
+            this.input.value = this.options.formatSelection(result);
+        } else {
+            this.input.value = `${code} - ${desc}`;
+        }
         this.input.dataset.value = code;
         
         if (this.options.onSelect) {

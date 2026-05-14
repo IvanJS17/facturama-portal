@@ -46,20 +46,14 @@
                     <label for="product_code">Código SAT (ProdServ) *</label>
                     <input type="text" id="product_code" name="product_code" 
                            value="{{ product.product_code if product else '01010101' }}" 
-                           maxlength="8" placeholder="Buscar código SAT..."
-                           data-sat-search="clave-prod-serv"
-                           data-placeholder="Buscar por código o descripción..."
-                           data-min-chars="2">
+                           maxlength="8" placeholder="Buscar código SAT...">
                     <small class="form-help">Código de 8 dígitos del catálogo SAT de productos/servicios</small>
                 </div>
                 <div class="form-group">
                     <label for="unit_code">Clave de unidad SAT *</label>
                     <input type="text" id="unit_code" name="unit_code" 
                            value="{{ product.unit_code if product else 'E48' }}" 
-                           maxlength="3" placeholder="Buscar clave de unidad..."
-                           data-sat-search="clave-unidad"
-                           data-placeholder="Buscar por clave o nombre..."
-                           data-min-chars="1">
+                           maxlength="3" placeholder="Buscar clave de unidad...">
                     <small class="form-help">Clave de unidad de medida (ej: E48 = Servicio, H87 = Pieza)</small>
                 </div>
             </div>
@@ -114,6 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const symbol = result.symbol ? ` (${result.symbol})` : '';
                 return `<strong>${escapeHtml(code)}</strong> - ${escapeHtml(name)}${symbol}`;
             },
+            formatSelection: function(result) {
+                // Only show the code in the input field
+                return result.code || '';
+            },
             onSelect: function(result) {
                 // Auto-populate the unit name field
                 unitInput.value = result.name || '';
@@ -129,7 +127,11 @@ document.addEventListener('DOMContentLoaded', function() {
             placeholder: 'Buscar por código o descripción...',
             minChars: 2,
             displayField: 'description',
-            valueField: 'code'
+            valueField: 'code',
+            formatSelection: function(result) {
+                // Only show the code in the input field
+                return result.code || '';
+            }
         });
     }
     
