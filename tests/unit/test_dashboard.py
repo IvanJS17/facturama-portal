@@ -194,7 +194,7 @@ def test_dashboard_has_issuer_name_in_row(tmp_path):
 
     assert response.status_code == 200
     # The template renders issuer_name in a <strong> tag
-    assert b"Issuer A" in response.data
+    assert b"ISSUER A" in response.data
 
 
 def test_dashboard_has_client_name_in_row(tmp_path):
@@ -205,7 +205,7 @@ def test_dashboard_has_client_name_in_row(tmp_path):
     response = app.test_client().get("/")
 
     assert response.status_code == 200
-    assert b"Cliente A" in response.data
+    assert b"CLIENTE A" in response.data
 
 
 def test_dashboard_has_recipient_rfc(tmp_path):

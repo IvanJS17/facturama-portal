@@ -64,6 +64,8 @@ def test_fresh_schema_has_required_issuer_scoped_columns(tmp_path):
     cfdi_columns = column_info(database, "cfdis")
     item_columns = column_info(database, "cfdi_items")
     series_columns = column_info(database, "invoice_series")
+    issuer_csd_columns = column_info(database, "issuer_csd")
+    client_products_columns = column_info(database, "client_products")
 
     assert client_columns["issuer_id"]["notnull"] == 1
     assert product_columns["issuer_id"]["notnull"] == 1
@@ -71,6 +73,10 @@ def test_fresh_schema_has_required_issuer_scoped_columns(tmp_path):
     assert {"serie", "folio"} <= set(cfdi_columns)
     assert {"cfdi_id", "product_id", "issuer_id", "client_id", "total"} <= set(item_columns)
     assert {"issuer_id", "series", "next_folio", "active"} <= set(series_columns)
+    assert {"issuer_id", "certificate_number", "certificate_valid_from", "certificate_valid_to", "active"} <= set(
+        issuer_csd_columns
+    )
+    assert {"issuer_id", "client_id", "product_id", "created_at", "updated_at"} <= set(client_products_columns)
 
     with database.connect() as conn:
         client_indexes = conn.execute("PRAGMA index_list(clients)").fetchall()
@@ -82,6 +88,71 @@ def test_fresh_schema_has_required_issuer_scoped_columns(tmp_path):
     assert "issuer_id" in column_info(database, "products")
 
 
+def test_legacy_schema_adds_missing_timestamps_and_phase1_tables(tmp_path):
+    db_path = tmp_path / "legacy_timestamps.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(
+        """
+        CREATE TABLE issuers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            legal_name TEXT NOT NULL,
+            rfc TEXT NOT NULL UNIQUE,
+            tax_regime TEXT NOT NULL,
+            zip_code TEXT NOT NULL,
+            email TEXT NOT NULL DEFAULT '',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        INSERT INTO issuers
+            (legal_name, rfc, tax_regime, zip_code, email, active, created_at, updated_at)
+        VALUES ('Issuer A', 'AAA010101AAA', '601', '01000', '', 1, 'now', 'now');
+
+        CREATE TABLE invoice_series (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            issuer_id INTEGER NOT NULL,
+            series TEXT NOT NULL DEFAULT 'FAC',
+            next_folio INTEGER NOT NULL DEFAULT 1,
+            active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (issuer_id) REFERENCES issuers(id),
+            UNIQUE(issuer_id, series)
+        );
+
+        CREATE TABLE cfdi_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cfdi_id INTEGER NOT NULL,
+            product_id INTEGER,
+            issuer_id INTEGER NOT NULL,
+            client_id INTEGER,
+            description TEXT NOT NULL DEFAULT '',
+            name TEXT NOT NULL DEFAULT '',
+            product_code TEXT NOT NULL DEFAULT '',
+            identification_number TEXT NOT NULL DEFAULT '',
+            quantity REAL NOT NULL DEFAULT 0,
+            unit_price REAL NOT NULL DEFAULT 0,
+            subtotal REAL NOT NULL DEFAULT 0,
+            total REAL NOT NULL DEFAULT 0,
+            FOREIGN KEY (issuer_id) REFERENCES issuers(id)
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    database = PortalDatabase(f"sqlite:///{db_path}")
+    database.init_schema()
+
+    series_columns = column_info(database, "invoice_series")
+    item_columns = column_info(database, "cfdi_items")
+    assert "created_at" in series_columns
+    assert "updated_at" in series_columns
+    assert "created_at" in item_columns
+    with database.connect() as conn2:
+        table_names = {row["name"] for row in conn2.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    assert "issuer_csd" in table_names
+    assert "client_products" in table_names
+
+
 def test_clients_are_unique_per_issuer_not_globally(tmp_path):
     database = make_db(tmp_path)
     issuer_a = database.save_issuer(issuer_payload("Issuer A", "AAA010101AAA"))
@@ -91,7 +162,7 @@ def test_clients_are_unique_per_issuer_not_globally(tmp_path):
     client_b = database.upsert_client(client_payload(issuer_b, "Same RFC B", "COSC8001137NA"))
 
     assert client_a != client_b
-    assert database.get_client_for_issuer(client_a, issuer_a)["legal_name"] == "Same RFC A"
+    assert database.get_client_for_issuer(client_a, issuer_a)["legal_name"] == "SAME RFC A"
     assert database.get_client_for_issuer(client_a, issuer_b) is None
     assert [row["id"] for row in database.list_clients(issuer_a)] == [client_a]
 
@@ -112,7 +183,7 @@ def test_products_are_scoped_by_issuer_and_list_with_issuer_info(tmp_path):
 
     issuer_a_products = database.list_products(issuer_id=issuer_a)
     assert [row["id"] for row in issuer_a_products] == [product_a]
-    assert issuer_a_products[0]["issuer_name"] == "Issuer A"
+    assert issuer_a_products[0]["issuer_name"] == "ISSUER A"
 
 
 def test_cfdi_client_backfill_and_invoiced_product_history(tmp_path):
@@ -146,13 +217,13 @@ def test_cfdi_client_backfill_and_invoiced_product_history(tmp_path):
 
     cfdi = database.get_cfdi(cfdi_id)
     assert cfdi["client_id"] == client_id
-    assert cfdi["client_name"] == "Acme"
+    assert cfdi["client_name"] == "ACME"
 
     invoiced_products = database.list_invoiced_products(issuer_id)
     assert len(invoiced_products) == 1
     assert invoiced_products[0]["product_id"] == product_id
-    assert invoiced_products[0]["issuer_name"] == "Issuer A"
-    assert invoiced_products[0]["billed_client_names"] == "Acme"
+    assert invoiced_products[0]["issuer_name"] == "ISSUER A"
+    assert invoiced_products[0]["billed_client_names"] == "ACME"
     assert invoiced_products[0]["billed_client_rfcs"] == "ACM010101ABC"
 
 

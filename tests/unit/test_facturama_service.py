@@ -113,4 +113,4 @@ def test_cache_cfdi_result_persists_client_and_item_links(tmp_path, mock_config)
     cfdis = database.list_cfdis(recipient_rfc="CLA010101ABC", status="active")
     assert len(cfdis) == 1
     assert cfdis[0]["client_id"] == client_id
-    assert database.list_invoiced_products(issuer_id=issuer_id)[0]["billed_client_names"] == "Cliente A"
+    assert database.list_invoiced_products(issuer_id=issuer_id)[0]["billed_client_names"] == "CLIENTE A"

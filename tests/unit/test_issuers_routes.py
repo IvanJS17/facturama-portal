@@ -86,4 +86,4 @@ def test_issuer_edit_route_rejects_post_and_update_route_accepts_post(tmp_path):
 
     assert correct_post.status_code == 302
     updated = database.get_issuer(issuer_id)
-    assert updated["legal_name"] == "Issuer Updated"
+    assert updated["legal_name"] == "ISSUER UPDATED"

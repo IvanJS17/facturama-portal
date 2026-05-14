@@ -100,7 +100,7 @@ def test_create_client_saves_under_selected_issuer_and_redirects_to_edit(tmp_pat
     clients = database.list_clients(issuer_id=issuer_id)
     assert len(clients) == 1
     assert clients[0]["issuer_id"] == issuer_id
-    assert clients[0]["issuer_name"] == "Issuer A"
+    assert clients[0]["issuer_name"] == "ISSUER A"
 
 
 def test_client_form_actions_point_to_create_and_update_routes(tmp_path):

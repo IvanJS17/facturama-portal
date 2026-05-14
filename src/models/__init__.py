@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+from src.utils.fiscal import normalize_legal_name, normalize_postal_code, normalize_rfc
+
 
 def utc_now() -> str:
     """Return an ISO-8601 UTC timestamp."""
@@ -166,8 +168,29 @@ class PortalDatabase:
                 self._migrate_cfdis(conn)
                 self._ensure_cfdi_items(conn)
                 self._ensure_invoice_series(conn)
+                self._ensure_issuer_csd(conn)
+                self._ensure_client_products(conn)
+                self._ensure_timestamps(conn, "invoice_series", ("created_at", "updated_at"))
+                self._ensure_timestamps(conn, "cfdi_items", ("created_at",))
             finally:
                 conn.execute("PRAGMA foreign_keys = ON")
+
+    def _ensure_timestamps(
+        self,
+        conn: sqlite3.Connection,
+        table_name: str,
+        columns: tuple[str, ...],
+    ) -> None:
+        existing = _table_columns(conn, table_name)
+        now = utc_now()
+        for column in columns:
+            if column in existing:
+                continue
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column} TEXT")
+            conn.execute(
+                f"UPDATE {table_name} SET {column} = ? WHERE {column} IS NULL OR TRIM({column}) = ''",
+                (now,),
+            )
 
     def _migrate_clients(self, conn: sqlite3.Connection) -> None:
         exists = bool(_table_sql(conn, "clients"))
@@ -400,6 +423,48 @@ class PortalDatabase:
             """
         )
 
+    def _ensure_issuer_csd(self, conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS issuer_csd (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer_id INTEGER NOT NULL,
+                certificate_number TEXT NOT NULL DEFAULT '',
+                certificate_valid_from TEXT NOT NULL DEFAULT '',
+                certificate_valid_to TEXT NOT NULL DEFAULT '',
+                private_key_encrypted INTEGER NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (issuer_id) REFERENCES issuers(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_issuer_csd_issuer_active
+            ON issuer_csd(issuer_id, active);
+            """
+        )
+
+    def _ensure_client_products(self, conn: sqlite3.Connection) -> None:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS client_products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                issuer_id INTEGER NOT NULL,
+                client_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (issuer_id) REFERENCES issuers(id),
+                FOREIGN KEY (client_id) REFERENCES clients(id),
+                FOREIGN KEY (product_id) REFERENCES products(id),
+                UNIQUE(issuer_id, client_id, product_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_client_products_issuer_client
+            ON client_products(issuer_id, client_id);
+            CREATE INDEX IF NOT EXISTS idx_client_products_issuer_product
+            ON client_products(issuer_id, product_id);
+            """
+        )
+
     def list_series(self, issuer_id: int) -> list[sqlite3.Row]:
         with self.connect() as conn:
             return conn.execute(
@@ -500,10 +565,10 @@ class PortalDatabase:
     def save_issuer(self, data: dict[str, Any], issuer_id: int | None = None) -> int:
         now = utc_now()
         values = (
-            data["legal_name"].strip(),
-            data["rfc"].strip().upper(),
+            normalize_legal_name(data["legal_name"]),
+            normalize_rfc(data["rfc"]),
             data["tax_regime"].strip(),
-            data["zip_code"].strip(),
+            normalize_postal_code(data["zip_code"]),
             data.get("email", "").strip(),
             1 if data.get("active", True) else 0,
             now,
@@ -582,12 +647,12 @@ class PortalDatabase:
         values = (
             data.get("facturama_id", "").strip(),
             issuer_id,
-            data["legal_name"].strip(),
-            data["rfc"].strip().upper(),
+            normalize_legal_name(data["legal_name"]),
+            normalize_rfc(data["rfc"]),
             data.get("email", "").strip(),
             data["tax_regime"].strip(),
             data["cfdi_use"].strip(),
-            data["zip_code"].strip(),
+            normalize_postal_code(data["zip_code"]),
             raw_payload,
             now,
         )
@@ -624,7 +689,7 @@ class PortalDatabase:
             )
             row = conn.execute(
                 "SELECT id FROM clients WHERE rfc = ? AND issuer_id = ?",
-                (data["rfc"].strip().upper(), data.get("issuer_id")),
+                (normalize_rfc(data["rfc"]), data.get("issuer_id")),
             ).fetchone()
             return int(row["id"])
 

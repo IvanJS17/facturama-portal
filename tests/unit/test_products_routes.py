@@ -136,7 +136,7 @@ def test_products_list_filters_catalog_and_invoiced_clients_by_issuer(tmp_path):
 
     assert response.status_code == 200
     assert b"Servicio A" in response.data
-    assert b"Cliente A" in response.data
+    assert b"CLIENTE A" in response.data
     assert b"AAA010101AAA" in response.data
     assert b"Servicio B" not in response.data
     assert b"Cliente B" not in response.data
