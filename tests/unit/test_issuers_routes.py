@@ -20,6 +20,7 @@ def make_app(database):
     app.extensions["portal_db"] = database
     app.register_blueprint(dashboard_routes.bp)
     app.register_blueprint(issuer_routes.bp)
+    app.register_blueprint(issuer_routes.api_bp)
     app.register_blueprint(client_routes.bp)
     app.register_blueprint(product_routes.bp)
     app.register_blueprint(cfdi_routes.bp)
@@ -87,3 +88,71 @@ def test_issuer_edit_route_rejects_post_and_update_route_accepts_post(tmp_path):
     assert correct_post.status_code == 302
     updated = database.get_issuer(issuer_id)
     assert updated["legal_name"] == "ISSUER UPDATED"
+
+
+def test_create_issuer_invalid_fiscal_fields_shows_validation_error_without_500(tmp_path):
+    database = make_db(tmp_path)
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/issuers/",
+        data={
+            "legal_name": "",
+            "rfc": "BADRFC",
+            "tax_regime": "601",
+            "zip_code": "12",
+            "email": "",
+            "active": "1",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Error de validaci" in response.data
+    assert database.list_issuers() == []
+
+
+def test_update_issuer_invalid_fiscal_fields_shows_validation_error_without_500(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/issuers/{issuer_id}",
+        data={
+            "legal_name": "",
+            "rfc": "BADRFC",
+            "tax_regime": "601",
+            "zip_code": "12",
+            "email": "",
+            "active": "1",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Error de validaci" in response.data
+    updated = database.get_issuer(issuer_id)
+    assert updated["legal_name"] == "ISSUER A"
+
+
+def test_api_create_issuer_invalid_fiscal_fields_returns_400_json(tmp_path):
+    database = make_db(tmp_path)
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/api/issuers/",
+        json={
+            "legal_name": "",
+            "rfc": "BADRFC",
+            "tax_regime": "601",
+            "zip_code": "12",
+            "email": "",
+            "active": True,
+        },
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert "error" in body
+    assert database.list_issuers() == []

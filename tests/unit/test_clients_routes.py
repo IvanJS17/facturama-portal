@@ -118,3 +118,77 @@ def test_client_form_actions_point_to_create_and_update_routes(tmp_path):
 
     assert edit_response.status_code == 200
     assert f'<form method="post" action="/clients/{client_id}">'.encode() in edit_response.data
+
+
+def test_create_client_invalid_fiscal_fields_shows_validation_error_without_500(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/clients/",
+        data={
+            "issuer_id": str(issuer_id),
+            "legal_name": "",
+            "rfc": "BADRFC",
+            "email": "cliente@example.com",
+            "tax_regime": "601",
+            "cfdi_use": "G03",
+            "zip_code": "12",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Error de validaci" in response.data
+    assert database.list_clients(issuer_id=issuer_id) == []
+
+
+def test_update_client_invalid_fiscal_fields_shows_validation_error_without_500(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    client_id = database.upsert_client(client_payload(issuer_id))
+    app = make_app(database)
+
+    response = app.test_client().post(
+        f"/clients/{client_id}",
+        data={
+            "issuer_id": str(issuer_id),
+            "legal_name": "",
+            "rfc": "BADRFC",
+            "email": "cliente@example.com",
+            "tax_regime": "601",
+            "cfdi_use": "G03",
+            "zip_code": "12",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Error de validaci" in response.data
+    client = database.get_client(client_id)
+    assert client["legal_name"] == "CLIENTE EMISOR A"
+
+
+def test_api_create_client_invalid_fiscal_fields_returns_400_json(tmp_path):
+    database = make_db(tmp_path)
+    issuer_id = database.save_issuer(issuer_payload())
+    app = make_app(database)
+
+    response = app.test_client().post(
+        "/api/clients/",
+        json={
+            "issuer_id": issuer_id,
+            "legal_name": "",
+            "rfc": "BADRFC",
+            "email": "cliente@example.com",
+            "tax_regime": "601",
+            "cfdi_use": "G03",
+            "zip_code": "12",
+        },
+    )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert "error" in body
+    assert database.list_clients(issuer_id=issuer_id) == []

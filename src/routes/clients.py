@@ -66,7 +66,15 @@ def create_client():
     facturama_response = {}
     if request.form.get("sync_facturama"):
         facturama_response = api().create_client(build_client_payload(payload))
-    client_id = db().upsert_client(_form_to_local(payload, facturama_response))
+    try:
+        client_id = db().upsert_client(_form_to_local(payload, facturama_response))
+    except ValueError as exc:
+        return flash_and_redirect(
+            f"Error de validacion fiscal: {exc}",
+            "clients.new_client",
+            category="error",
+            issuer_id=payload.get("issuer_id"),
+        )
     return flash_and_redirect("Cliente guardado.", "clients.edit_client", client_id=client_id)
 
 
@@ -88,7 +96,15 @@ def update_client(client_id: int):
     facturama_response = {}
     if request.form.get("sync_facturama") and existing.get("facturama_id"):
         facturama_response = api().update_client(existing["facturama_id"], build_client_payload(payload))
-    db().upsert_client(_form_to_local(payload, facturama_response), client_id)
+    try:
+        db().upsert_client(_form_to_local(payload, facturama_response), client_id)
+    except ValueError as exc:
+        return flash_and_redirect(
+            f"Error de validacion fiscal: {exc}",
+            "clients.edit_client",
+            category="error",
+            client_id=client_id,
+        )
     return flash_and_redirect("Cliente actualizado.", "clients.list_clients", issuer_id=int(payload["issuer_id"]))
 
 
@@ -111,7 +127,10 @@ def api_list_clients():
 def api_create_client():
     payload = request.get_json() or {}
     facturama_response = api().create_client(build_client_payload(payload)) if payload.get("sync_facturama") else {}
-    client_id = db().upsert_client(_form_to_local(payload, facturama_response))
+    try:
+        client_id = db().upsert_client(_form_to_local(payload, facturama_response))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     return jsonify({"id": client_id, "facturama": facturama_response}), 201
 
 

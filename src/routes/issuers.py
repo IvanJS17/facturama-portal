@@ -20,7 +20,10 @@ def new_issuer():
 
 @bp.post("/")
 def create_issuer():
-    issuer_id = db().save_issuer(request.form.to_dict())
+    try:
+        issuer_id = db().save_issuer(request.form.to_dict())
+    except ValueError as exc:
+        return flash_and_redirect(f"Error de validacion fiscal: {exc}", "issuers.new_issuer", category="error")
     return flash_and_redirect("Emisor guardado.", "issuers.edit_issuer", issuer_id=issuer_id)
 
 
@@ -34,7 +37,15 @@ def edit_issuer(issuer_id: int):
 def update_issuer(issuer_id: int):
     payload = request.form.to_dict()
     payload["active"] = "active" in request.form
-    db().save_issuer(payload, issuer_id)
+    try:
+        db().save_issuer(payload, issuer_id)
+    except ValueError as exc:
+        return flash_and_redirect(
+            f"Error de validacion fiscal: {exc}",
+            "issuers.edit_issuer",
+            category="error",
+            issuer_id=issuer_id,
+        )
     return flash_and_redirect("Emisor actualizado.", "issuers.list_issuers")
 
 
@@ -65,5 +76,8 @@ def api_list_issuers():
 @api_bp.post("/")
 def api_create_issuer():
     payload = request.get_json() if wants_json() else request.form.to_dict()
-    issuer_id = db().save_issuer(payload)
+    try:
+        issuer_id = db().save_issuer(payload)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     return jsonify({"id": issuer_id}), 201
